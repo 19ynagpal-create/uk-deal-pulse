@@ -69,7 +69,12 @@ export function MonthlyBars({
       <BarChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke="var(--color-border)" />
         <XAxis dataKey="month" tickFormatter={monthLabel} {...axis} />
-        <YAxis {...axis} width={56} tickFormatter={(v) => (formatter ? formatter(v) : String(v))} />
+        <YAxis
+          {...axis}
+          width={56}
+          allowDecimals={false}
+          tickFormatter={(v) => (formatter ? formatter(v) : String(v))}
+        />
         <Tooltip
           {...tooltipStyle}
           labelFormatter={(l) => monthLabel(String(l))}
@@ -140,7 +145,7 @@ export function CategoryBars({
     <ChartFrame height={height}>
       <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
         <CartesianGrid horizontal={false} stroke="var(--color-border)" />
-        <XAxis type="number" {...axis} tickFormatter={(v) => (formatter ? formatter(v) : String(v))} />
+        <XAxis type="number" allowDecimals={false} {...axis} tickFormatter={(v) => (formatter ? formatter(v) : String(v))} />
         <YAxis type="category" dataKey={categoryKey} {...axis} width={120} />
         <Tooltip {...tooltipStyle} formatter={(v: number) => [formatter ? formatter(v) : v, name]} />
         <Bar dataKey={valueKey} maxBarSize={20}>
