@@ -8,10 +8,9 @@
  * enforced by Row Level Security on the external project.
  *
  * Configuration (in priority order):
- *   1. Environment variables (browser: VITE_EXTERNAL_SUPABASE_URL /
- *      VITE_EXTERNAL_SUPABASE_PUBLISHABLE_KEY; server/SSR: SUPABASE_URL /
- *      SUPABASE_PUBLISHABLE_KEY)
- *   2. The fallback constants below.
+ *   1. Environment variables (VITE_EXTERNAL_SUPABASE_URL /
+ *      VITE_EXTERNAL_SUPABASE_PUBLISHABLE_KEY)
+ *   2. The fallback constants below (the owner's external project).
  *
  * The publishable key is a public credential and is safe to keep in the
  * codebase; it grants only the access allowed by the external project's
@@ -22,21 +21,14 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
 // Public, non-secret configuration for the owner's external Supabase project.
-const FALLBACK_URL = "https://YOUR-EXTERNAL-PROJECT.supabase.co";
-const FALLBACK_PUBLISHABLE_KEY = "YOUR-EXTERNAL-PUBLISHABLE-KEY";
+const FALLBACK_URL = "https://cczlwhdlsfjhehhkoget.supabase.co";
+const FALLBACK_PUBLISHABLE_KEY = "sb_publishable_7p33M4L9f7pSattJfiE9PA_wJZiWLOa";
 
 const EXTERNAL_SUPABASE_URL =
-  import.meta.env["VITE_EXTERNAL_SUPABASE_URL"] ||
-  import.meta.env["SUPABASE_URL"] ||
-  (typeof process !== "undefined" ? process.env["SUPABASE_URL"] : undefined) ||
-  FALLBACK_URL;
+  import.meta.env["VITE_EXTERNAL_SUPABASE_URL"] || FALLBACK_URL;
 
 const EXTERNAL_SUPABASE_PUBLISHABLE_KEY =
   import.meta.env["VITE_EXTERNAL_SUPABASE_PUBLISHABLE_KEY"] ||
-  import.meta.env["SUPABASE_PUBLISHABLE_KEY"] ||
-  (typeof process !== "undefined"
-    ? process.env["SUPABASE_PUBLISHABLE_KEY"]
-    : undefined) ||
   FALLBACK_PUBLISHABLE_KEY;
 
 function isNewSupabaseApiKey(value: string): boolean {
