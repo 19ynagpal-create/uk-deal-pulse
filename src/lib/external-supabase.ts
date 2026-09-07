@@ -22,8 +22,8 @@ import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
 
 // Public, non-secret configuration for the owner's external Supabase project.
-const FALLBACK_URL = "https://YOUR-EXTERNAL-PROJECT.supabase.co";
-const FALLBACK_PUBLISHABLE_KEY = "YOUR-EXTERNAL-PUBLISHABLE-KEY";
+const FALLBACK_URL = "https://cczlwhdlsfjhehhkoget.supabase.co";
+const FALLBACK_PUBLISHABLE_KEY = "sb_publishable_7p33M4L9f7pSattJfiE9PA_wJZiWLOa";
 
 const EXTERNAL_SUPABASE_URL =
   import.meta.env["VITE_EXTERNAL_SUPABASE_URL"] ||
