@@ -8,10 +8,9 @@
  * enforced by Row Level Security on the external project.
  *
  * Configuration (in priority order):
- *   1. Environment variables (browser: VITE_EXTERNAL_SUPABASE_URL /
- *      VITE_EXTERNAL_SUPABASE_PUBLISHABLE_KEY; server/SSR: SUPABASE_URL /
- *      SUPABASE_PUBLISHABLE_KEY)
- *   2. The fallback constants below.
+ *   1. Environment variables (VITE_EXTERNAL_SUPABASE_URL /
+ *      VITE_EXTERNAL_SUPABASE_PUBLISHABLE_KEY)
+ *   2. The fallback constants below (the owner's external project).
  *
  * The publishable key is a public credential and is safe to keep in the
  * codebase; it grants only the access allowed by the external project's
