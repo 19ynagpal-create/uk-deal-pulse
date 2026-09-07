@@ -8,7 +8,6 @@ import {
   ErrorState,
   LoadingRows,
   PageHeader,
-  SampleDataNotice,
 } from "@/components/data/primitives";
 import {
   Select,
@@ -64,7 +63,6 @@ function AdvisersPage() {
         league table and should not be read as one.
       </div>
 
-      <SampleDataNotice className="mt-3" />
 
       <div className="mt-5 border border-border bg-card">
         <div className="grid grid-cols-1 gap-3 border-b border-border p-4 sm:grid-cols-2">

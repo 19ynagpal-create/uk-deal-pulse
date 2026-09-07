@@ -8,7 +8,6 @@ import {
   LoadingRows,
   PageHeader,
   Panel,
-  SampleDataNotice,
 } from "@/components/data/primitives";
 
 export const Route = createFileRoute("/analytics")({
@@ -56,7 +55,6 @@ function AnalyticsPage() {
         description="Aggregate views of tracked UK public takeover activity. All figures are derived from records in the UK Deal Pulse dataset."
       />
 
-      <SampleDataNotice className="mt-5" />
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel title="Deal activity over time" note="Tracked transactions by month">

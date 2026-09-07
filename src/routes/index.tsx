@@ -15,7 +15,6 @@ import {
   ErrorState,
   LoadingRows,
   Panel,
-  SampleDataNotice,
   StatCard,
 } from "@/components/data/primitives";
 
@@ -90,7 +89,6 @@ function Dashboard() {
         </div>
       </section>
 
-      <SampleDataNotice className="mt-6" />
 
       <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.isPending && (

@@ -10,7 +10,6 @@ import {
   ErrorState,
   LoadingRows,
   PageHeader,
-  SampleDataNotice,
 } from "@/components/data/primitives";
 import { Input } from "@/components/ui/input";
 import {
@@ -70,7 +69,6 @@ function DealsPage() {
         description="Every transaction tracked by UK Deal Pulse. Search by company or sector, then filter and sort the results."
       />
 
-      <SampleDataNotice className="mt-5" />
 
       <div className="mt-5 border border-border bg-card">
         <div className="grid grid-cols-1 gap-3 border-b border-border p-4 md:grid-cols-2 xl:grid-cols-4">
