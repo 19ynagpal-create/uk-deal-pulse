@@ -70,17 +70,23 @@ export function StatCard({
   );
 }
 
-export function SampleDataNotice({ className }: { className?: string }) {
+export function NoDataNotice({
+  className,
+  message,
+}: {
+  className?: string;
+  message?: string;
+}) {
   return (
     <div
       className={cn(
-        "border border-border-strong border-l-4 border-l-accent bg-surface px-4 py-2.5 text-xs leading-relaxed text-muted-foreground",
+        "border border-border-strong border-l-4 border-l-accent bg-surface px-4 py-3 text-xs leading-relaxed text-muted-foreground",
         className,
       )}
     >
-      <span className="font-semibold text-foreground">Development sample data.</span>{" "}
-      All figures shown are illustrative placeholder records used during build. They are not
-      UK Deal Pulse statistics and will be replaced by validated database records.
+      <span className="font-semibold text-foreground">No verified transactions yet.</span>{" "}
+      {message ??
+        "Statistics appear here once verified records are published to the database. Nothing is estimated or simulated in the meantime."}
     </div>
   );
 }
@@ -90,7 +96,8 @@ export function StatusBadge({ status }: { status: DealStatus }) {
     Announced: "border-border-strong text-foreground",
     Recommended: "border-accent/50 text-accent",
     Completed: "border-positive/40 text-positive",
-    Lapsed: "border-destructive/40 text-destructive",
+    Withdrawn: "border-destructive/40 text-destructive",
+    Other: "border-border text-muted-foreground",
   };
   return (
     <span

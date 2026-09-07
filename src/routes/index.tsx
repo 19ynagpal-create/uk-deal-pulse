@@ -15,8 +15,8 @@ import {
   ErrorState,
   LoadingRows,
   Panel,
-  SampleDataNotice,
   StatCard,
+  NoDataNotice,
 } from "@/components/data/primitives";
 
 export const Route = createFileRoute("/")({
@@ -63,6 +63,8 @@ function Dashboard() {
     queryFn: () => dealsRepository.advisers(),
   });
 
+  const isEmpty = stats.data?.dealCount === 0;
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
       <section className="border-b border-border pb-6">
@@ -90,7 +92,10 @@ function Dashboard() {
         </div>
       </section>
 
-      <SampleDataNotice className="mt-6" />
+      {isEmpty ? (
+        <NoDataNotice className="mt-6" />
+      ) : (
+      <>
 
       <section className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {stats.isPending && (
@@ -298,6 +303,8 @@ function Dashboard() {
           )}
         </Panel>
       </div>
+      </>
+      )}
     </div>
   );
 }

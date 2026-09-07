@@ -8,7 +8,7 @@ import {
   LoadingRows,
   PageHeader,
   Panel,
-  SampleDataNotice,
+  NoDataNotice,
 } from "@/components/data/primitives";
 
 export const Route = createFileRoute("/analytics")({
@@ -46,6 +46,8 @@ function AnalyticsPage() {
     queryFn: () => dealsRepository.largestDeals(8),
   });
 
+  const isEmpty = monthly.data?.length === 0;
+
   const state = (q: { isPending: boolean; isError: boolean }) =>
     q.isPending ? <LoadingRows rows={5} /> : q.isError ? <ErrorState /> : null;
 
@@ -56,8 +58,10 @@ function AnalyticsPage() {
         description="Aggregate views of tracked UK public takeover activity. All figures are derived from records in the UK Deal Pulse dataset."
       />
 
-      <SampleDataNotice className="mt-5" />
 
+      {isEmpty && <NoDataNotice className="mt-5" />}
+
+      {!isEmpty && (
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel title="Deal activity over time" note="Tracked transactions by month">
           {state(monthly) ??
@@ -85,9 +89,12 @@ function AnalyticsPage() {
           {state(sectors) ??
             (sectors.data && (
               <CategoryBars
-                data={[...sectors.data].sort((a, b) => b.medianPremium - a.medianPremium)}
+                data={sectors.data
+                  .filter((s) => s.medianPremiumPct != null)
+                  .map((s) => ({ ...s, medianPremiumPct: s.medianPremiumPct as number }))
+                  .sort((a, b) => b.medianPremiumPct - a.medianPremiumPct)}
                 categoryKey="sector"
-                valueKey="medianPremium"
+                valueKey="medianPremiumPct"
                 name="Median premium"
                 formatter={(v) => `${v.toFixed(0)}%`}
               />
@@ -164,6 +171,7 @@ function AnalyticsPage() {
             ))}
         </Panel>
       </div>
+      )}
     </div>
   );
 }

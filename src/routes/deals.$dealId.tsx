@@ -5,7 +5,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import {
   dealsRepository,
   formatDate,
-  formatPence,
+  formatOfferPrice,
   formatPremium,
   formatValue,
   NOT_DISCLOSED,
@@ -14,7 +14,6 @@ import {
   ErrorState,
   LoadingRows,
   Panel,
-  SampleDataNotice,
   StatCard,
   StatusBadge,
 } from "@/components/data/primitives";
@@ -82,11 +81,10 @@ function DealDetail() {
             </h1>
           </header>
 
-          <SampleDataNotice className="mt-5" />
 
           <div className="mt-5 grid grid-cols-2 gap-3 xl:grid-cols-5">
             <StatCard label="Deal value" value={formatValue(deal.data.dealValueGbpM)} />
-            <StatCard label="Offer price" value={formatPence(deal.data.offerPricePence)} />
+            <StatCard label="Offer price" value={formatOfferPrice(deal.data.offerPrice, deal.data.offerPriceCurrency)} />
             <StatCard label="Takeover premium" value={formatPremium(deal.data.premiumPct)} />
             <StatCard label="Announced" value={formatDate(deal.data.announcementDate)} />
             <StatCard label="Status" value={deal.data.status} />
@@ -103,7 +101,7 @@ function DealDetail() {
                   value={deal.data.buyerType === "Private Equity" ? "Private equity" : "Strategic"}
                 />
                 <Detail label="Acquirer country" value={deal.data.acquirerCountry} />
-                <Detail label="Consideration" value={deal.data.consideration ?? NOT_DISCLOSED} />
+                <Detail label="Offer type" value={deal.data.offerType ?? NOT_DISCLOSED} />
               </dl>
             </Panel>
 
