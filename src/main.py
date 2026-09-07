@@ -13,10 +13,6 @@ from google.genai import errors
 from discovery import discover_candidates
 
 
-# =========================================================
-# CONFIG
-# =========================================================
-
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
@@ -26,37 +22,18 @@ GEMINI_MODEL = "gemini-3.5-flash-lite"
 INVESTEGATE_BASE = "https://www.investegate.co.uk"
 INVESTEGATE_RNS = "https://www.investegate.co.uk/source/RNS"
 
-# Scan recent RNS pages.
-# Once per week, this is still very low usage.
 MAX_RNS_PAGES = 25
-
 REQUEST_TIMEOUT = 30
 
 HEADERS = {
-    "User-Agent": (
-        "UKDealPulse/1.0 "
-        "(educational UK M&A research project)"
-    )
+    "User-Agent": "UKDealPulse/1.0"
 }
-
-TAKEOVER_KEYWORDS = (
-    "acquisition",
-    "recommended cash",
-    "recommended offer",
-    "firm offer",
-    "cash offer",
-    "takeover",
-    "scheme of arrangement",
-    "offer for",
-    "merger",
-    "rule 2.7",
-)
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # =========================================================
-# HELPERS
+# DB
 # =========================================================
 
 def db_headers():
@@ -67,67 +44,131 @@ def db_headers():
     }
 
 
-def normalize_name(value):
+# =========================================================
+# NAME MATCHING
+# =========================================================
+
+GENERIC_COMPANY_WORDS = {
+    "plc",
+    "limited",
+    "ltd",
+    "inc",
+    "incorporated",
+    "company",
+    "group",
+    "holdings",
+    "holding",
+    "energy",
+    "international",
+    "global",
+    "capital",
+    "resources",
+    "investment",
+    "investments",
+}
+
+
+def normalize_words(value):
     if not value:
-        return ""
+        return []
 
     value = value.lower()
-
-    replacements = [
-        "public limited company",
-        "plc",
-        "limited",
-        "ltd",
-        "incorporated",
-        "inc",
-        "holdings",
-        "group",
-    ]
-
-    for item in replacements:
-        value = value.replace(item, " ")
-
     value = re.sub(r"[^a-z0-9 ]", " ", value)
-    value = re.sub(r"\s+", " ", value)
+    value = re.sub(r"\s+", " ", value).strip()
 
-    return value.strip()
-
-
-def company_matches(candidate_name, text):
-    """
-    Conservative fuzzy-ish company matching.
-
-    We do not require the entire legal company suffix to match.
-    """
-
-    candidate = normalize_name(candidate_name)
-    haystack = normalize_name(text)
-
-    if not candidate or not haystack:
-        return False
-
-    if candidate in haystack:
-        return True
-
-    candidate_words = [
-        w for w in candidate.split()
-        if len(w) >= 4
+    return [
+        word
+        for word in value.split()
+        if word not in GENERIC_COMPANY_WORDS
+        and len(word) >= 3
     ]
 
-    if not candidate_words:
+
+def target_matches(target_name, listing_text):
+    """
+    Strict matching:
+    require at least one distinctive target token,
+    and for multi-word distinctive names require most of them.
+    """
+
+    target_words = normalize_words(target_name)
+    listing_words = set(normalize_words(listing_text))
+
+    if not target_words:
         return False
 
-    hits = sum(
-        1 for word in candidate_words
-        if word in haystack
-    )
+    matches = [
+        word
+        for word in target_words
+        if word in listing_words
+    ]
+
+    if len(target_words) == 1:
+        return len(matches) == 1
 
     required = max(
-        1,
-        int(len(candidate_words) * 0.7)
+        2,
+        int(len(target_words) * 0.75)
     )
 
-    return hits >= required
+    return len(matches) >= required
+
+
+# =========================================================
+# OBVIOUS NON-DEAL ANNOUNCEMENTS
+# =========================================================
+
+REJECT_TITLE_PATTERNS = (
+    "form 8.3",
+    "form 8.5",
+    "form 38.5",
+    "form 8 ",
+    "opening position disclosure",
+    "dealing disclosure",
+    "irish takeover panel",
+    "rule 8",
+    "rule 38",
+    "notification of major holdings",
+    "holding(s) in company",
+    "director dealing",
+    "transaction in own shares",
+)
+
+
+POSITIVE_TITLE_PATTERNS = (
+    "recommended cash acquisition",
+    "recommended acquisition",
+    "recommended offer",
+    "firm offer",
+    "cash offer",
+    "offer for",
+    "acquisition of",
+    "scheme of arrangement",
+    "final recommended cash offer",
+    "revised recommended cash offer",
+    "rule 2.7",
+)
+
+
+def is_obvious_non_deal(text):
+    lower = text.lower()
+
+    return any(
+        pattern in lower
+        for pattern in REJECT_TITLE_PATTERNS
+    )
+
+
+def looks_like_real_takeover_announcement(text):
+    lower = text.lower()
+
+    if is_obvious_non_deal(lower):
+        return False
+
+    return any(
+        pattern in lower
+        for pattern in POSITIVE_TITLE_PATTERNS
+    )
 
 
 # =========================================================
@@ -152,10 +193,7 @@ def source_already_processed(url):
     if not rows:
         return False
 
-    status = rows[0].get("processing_status")
-
-    # Allow failed jobs to retry later.
-    return status != "error"
+    return rows[0].get("processing_status") != "error"
 
 
 def mark_processed(
@@ -195,15 +233,10 @@ def mark_processed(
 
 
 # =========================================================
-# INVESTEGATE DISCOVERY
+# INVESTEGATE LISTINGS
 # =========================================================
 
 def scrape_rns_listing_page(page_number):
-    """
-    Collect announcement links from a recent Investegate
-    RNS listing page.
-    """
-
     url = f"{INVESTEGATE_RNS}?page={page_number}"
 
     r = requests.get(
@@ -211,21 +244,17 @@ def scrape_rns_listing_page(page_number):
         headers=HEADERS,
         timeout=REQUEST_TIMEOUT,
     )
-
     r.raise_for_status()
 
     soup = BeautifulSoup(
         r.text,
-        "html.parser",
+        "html.parser"
     )
 
     results = []
     seen = set()
 
-    for link in soup.find_all(
-        "a",
-        href=True,
-    ):
+    for link in soup.find_all("a", href=True):
         href = link.get("href", "")
 
         if "/announcement/" not in href:
@@ -233,7 +262,7 @@ def scrape_rns_listing_page(page_number):
 
         full_url = urljoin(
             INVESTEGATE_BASE,
-            href,
+            href
         )
 
         if full_url in seen:
@@ -241,99 +270,53 @@ def scrape_rns_listing_page(page_number):
 
         title = link.get_text(
             " ",
-            strip=True,
+            strip=True
         )
 
-        parent_text = ""
+        context_parts = [title]
 
         parent = link.parent
 
-        if parent:
-            parent_text = parent.get_text(
+        # Pull a little row context, but not huge page chunks.
+        for _ in range(3):
+            if not parent:
+                break
+
+            text = parent.get_text(
                 " ",
-                strip=True,
+                strip=True
             )
 
-            # Often useful context is higher up the row.
-            if parent.parent:
-                parent_text += " " + (
-                    parent.parent.get_text(
-                        " ",
-                        strip=True,
-                    )
-                )
+            if text and len(text) < 1000:
+                context_parts.append(text)
 
-        combined = (
-            title + " " + parent_text
-        ).strip()
+            parent = parent.parent
+
+        listing_text = " ".join(
+            dict.fromkeys(context_parts)
+        )
 
         seen.add(full_url)
 
-        results.append(
-            {
-                "url": full_url,
-                "title": title,
-                "listing_text": combined,
-            }
-        )
+        results.append({
+            "url": full_url,
+            "title": title,
+            "listing_text": listing_text,
+        })
 
     return results
 
 
-def looks_like_takeover_title(text):
-    text = text.lower()
-
-    return any(
-        keyword in text
-        for keyword in TAKEOVER_KEYWORDS
-    )
-
-
-def find_candidate_announcements(
-    panel_candidates,
-):
-    """
-    Scan recent RNS listings and match takeover-looking
-    announcements against current Takeover Panel candidates.
-    """
-
+def find_candidate_announcements(panel_candidates):
     matches = {}
-    candidate_keys = []
-
-    for candidate in panel_candidates:
-
-        target = candidate.get(
-            "target_name"
-        )
-
-        acquirer = candidate.get(
-            "acquirer_name"
-        )
-
-        if not target:
-            continue
-
-        key = (
-            normalize_name(target),
-            normalize_name(acquirer),
-        )
-
-        candidate_keys.append(
-            (
-                key,
-                target,
-                acquirer,
-            )
-        )
 
     for page in range(
         1,
-        MAX_RNS_PAGES + 1,
+        MAX_RNS_PAGES + 1
     ):
-
         print(
-            f"Scanning recent RNS page {page}/"
-            f"{MAX_RNS_PAGES}..."
+            f"Scanning RNS page "
+            f"{page}/{MAX_RNS_PAGES}..."
         )
 
         try:
@@ -342,59 +325,59 @@ def find_candidate_announcements(
             )
         except Exception as exc:
             print(
-                f"Could not scan RNS page "
-                f"{page}: {exc}"
+                f"Could not scan page {page}: {exc}"
             )
             continue
 
         for row in rows:
+            listing_text = row["listing_text"]
+            title = row["title"]
 
-            listing_text = row[
-                "listing_text"
-            ]
-
-            if not looks_like_takeover_title(
-                listing_text
+            # Reject obvious Rule 8 / dealing disclosure noise.
+            if is_obvious_non_deal(
+                title + " " + listing_text
             ):
                 continue
 
-            for (
-                key,
-                target,
-                acquirer,
-            ) in candidate_keys:
+            # Only consider titles which look like actual offer announcements.
+            if not looks_like_real_takeover_announcement(
+                title + " " + listing_text
+            ):
+                continue
 
-                if company_matches(
+            for candidate in panel_candidates:
+                target = candidate.get(
+                    "target_name"
+                )
+                acquirer = candidate.get(
+                    "acquirer_name"
+                )
+
+                if not target:
+                    continue
+
+                if not target_matches(
                     target,
-                    listing_text,
+                    listing_text
                 ):
+                    continue
 
-                    url = row["url"]
+                matches[row["url"]] = {
+                    "url": row["url"],
+                    "title": title,
+                    "target_hint": target,
+                    "acquirer_hint": acquirer,
+                }
 
-                    if url not in matches:
-                        matches[url] = {
-                            "url": url,
-                            "title": (
-                                row["title"]
-                                or listing_text[:200]
-                            ),
-                            "target_hint": target,
-                            "acquirer_hint": acquirer,
-                            "source_domain": (
-                                "investegate.co.uk"
-                            ),
-                        }
+                break
 
-                    break
-
-        # Be polite to the public site.
         time.sleep(0.25)
 
     return list(matches.values())
 
 
 # =========================================================
-# ANNOUNCEMENT FETCHING
+# FETCH FULL ANNOUNCEMENT
 # =========================================================
 
 def fetch_announcement_text(url):
@@ -403,209 +386,132 @@ def fetch_announcement_text(url):
         headers=HEADERS,
         timeout=REQUEST_TIMEOUT,
     )
-
     r.raise_for_status()
 
     soup = BeautifulSoup(
         r.text,
-        "html.parser",
+        "html.parser"
     )
 
-    # Strip layout/noise.
-    for element in soup(
-        [
-            "script",
-            "style",
-            "nav",
-            "footer",
-            "header",
-            "aside",
-        ]
-    ):
+    for element in soup([
+        "script",
+        "style",
+        "nav",
+        "footer",
+        "header",
+        "aside",
+    ]):
         element.decompose()
 
     text = soup.get_text(
         "\n",
-        strip=True,
+        strip=True
     )
 
     text = re.sub(
         r"\n{3,}",
         "\n\n",
-        text,
+        text
     )
 
-    # Protect against accidentally sending enormous pages.
     if len(text) > 100000:
         text = text[:100000]
 
     if len(text) < 300:
         raise ValueError(
-            "Announcement text was unexpectedly short."
+            "Announcement text too short"
         )
 
     return text
 
 
 # =========================================================
-# GEMINI EXTRACTION
+# GEMINI
 # =========================================================
 
 def extract_deal(
     source_text,
-    target_hint=None,
-    acquirer_hint=None,
+    target_hint,
+    acquirer_hint,
 ):
     prompt = f"""
-You are the structured-data extraction engine for
-UK Deal Pulse, a UK public M&A intelligence database.
+You are the structured-data extraction engine for UK Deal Pulse.
 
-Your task is factual extraction only.
+Use ONLY the supplied source announcement.
 
-SOURCE RULE
-
-Use ONLY the supplied announcement text.
-
-Do not rely on outside knowledge.
-
-If a field is unsupported, return null.
+If a fact is unsupported, return null.
 
 Never guess.
-
-Never invent missing deal values, advisers, premiums,
-financing, countries, offer prices or rationale.
-
-CANDIDATE HINTS
+Never infer missing advisers.
+Never calculate premiums.
+Never convert currencies yourself.
 
 The Takeover Panel discovery stage suggests:
 
-Possible target:
+Target:
 {target_hint}
 
-Possible offeror:
+Offeror:
 {acquirer_hint}
 
-These are ONLY hints.
-
+These are only hints.
 The announcement itself is authoritative.
 
-If the announcement contradicts the hints, use the
-announcement.
+A relevant transaction must clearly be:
+- an acquisition
+- takeover
+- firm offer
+- recommended offer
+- scheme acquisition
+- completed acquisition
 
-ELIGIBILITY
-
-The announcement must clearly concern an acquisition,
-takeover, merger, firm offer, recommended offer or
-completed acquisition involving the target.
-
-Do NOT treat:
-
+Reject:
+- Form 8.3
+- Form 8.5
+- Form 38.5
+- dealing disclosures
+- opening position disclosures
+- shareholding notifications
 - rumours
-- Rule 8 dealing disclosures
-- ordinary shareholding notifications
-- speculative press reports
-- vague expressions of interest
-- routine corporate announcements
+- speculative reports
 
-as confirmed transactions.
+announcement_date must be YYYY-MM-DD.
 
-DATE
+confidence must be a decimal number between 0 and 1.
 
-announcement_date MUST be:
-
-YYYY-MM-DD
-
-MONEY
-
-deal_value_gbp:
-
-Use ONLY a GBP equity/deal value explicitly stated
-in the announcement.
-
-Return the full number.
-
-Example:
-
-£1.25 billion -> 1250000000
-
-Do NOT convert currencies yourself.
-
-PREMIUM
-
-Only use a premium percentage explicitly stated.
-
-Do NOT calculate one.
-
-OFFER PRICE
-
-Use the explicitly stated per-share offer value.
-
-Examples of currency codes:
-
-GBP
-GBp
-USD
-EUR
-
-BUYER TYPE
-
-Return only:
-
+buyer_type:
 Strategic
 Private Equity
 null
 
-OFFER TYPE
-
-Return only:
-
+offer_type:
 Cash
 Shares
 Mixed
 Other
 null
 
-STATUS
-
-Return only:
-
+status:
 Announced
 Recommended
 Completed
 Withdrawn
 Other
 
-ADVISERS
+deal_value_gbp:
+only use an explicitly stated GBP deal/equity value.
+Return full integer number.
 
-Only populate an adviser if the announcement clearly
-identifies:
+premium_percent:
+only use an explicitly stated premium.
 
-1. the adviser; and
-2. which side the adviser represents.
+buyer_advisers / target_advisers:
+only populate when adviser side is explicit.
 
-Otherwise return null.
+strategic_rationale:
+maximum 65 words and source-grounded only.
 
-STRATEGIC RATIONALE
-
-Maximum 65 words.
-
-Use only rationale explicitly stated in the source.
-
-CONFIDENCE
-
-confidence MUST be a decimal number from 0 to 1.
-
-Use confidence for confidence that:
-
-- this is a genuine relevant transaction; and
-- the core transaction identity is extracted correctly.
-
-Never return:
-High
-Medium
-Low
-
-Return valid JSON ONLY with exactly these fields:
+Return valid JSON only:
 
 is_relevant_transaction
 target_name
@@ -627,13 +533,12 @@ strategic_rationale
 confidence
 uncertain_fields
 
-SOURCE ANNOUNCEMENT:
+SOURCE:
 
 {source_text}
 """
 
     for attempt in range(5):
-
         try:
             response = (
                 client.models.generate_content(
@@ -651,26 +556,22 @@ SOURCE ANNOUNCEMENT:
             )
 
         except errors.ServerError:
-
             if attempt == 4:
                 raise
 
-            wait_seconds = (
-                10 * (attempt + 1)
+            wait = 10 * (
+                attempt + 1
             )
 
             print(
-                "Gemini unavailable. "
-                f"Retrying in "
-                f"{wait_seconds}s..."
+                f"Gemini unavailable. "
+                f"Retrying in {wait}s..."
             )
 
-            time.sleep(
-                wait_seconds
-            )
+            time.sleep(wait)
 
     raise RuntimeError(
-        "Gemini did not return a response."
+        "Gemini failed"
     )
 
 
@@ -679,7 +580,6 @@ SOURCE ANNOUNCEMENT:
 # =========================================================
 
 def validate(deal):
-
     if (
         deal.get(
             "is_relevant_transaction"
@@ -687,7 +587,7 @@ def validate(deal):
         is not True
     ):
         raise ValueError(
-            "Not a relevant confirmed transaction."
+            "Not a relevant confirmed transaction"
         )
 
     required = [
@@ -700,20 +600,13 @@ def validate(deal):
     for field in required:
         if deal.get(field) is None:
             raise ValueError(
-                f"Missing required field: "
-                f"{field}"
+                f"Missing required field: {field}"
             )
 
-    try:
-        datetime.strptime(
-            deal["announcement_date"],
-            "%Y-%m-%d",
-        )
-    except ValueError:
-        raise ValueError(
-            "announcement_date must use "
-            "YYYY-MM-DD"
-        )
+    datetime.strptime(
+        deal["announcement_date"],
+        "%Y-%m-%d"
+    )
 
     confidence = float(
         deal["confidence"]
@@ -721,69 +614,20 @@ def validate(deal):
 
     if not 0 <= confidence <= 1:
         raise ValueError(
-            "confidence must be between "
-            "0 and 1"
-        )
-
-    allowed_buyer_types = {
-        "Strategic",
-        "Private Equity",
-        None,
-    }
-
-    allowed_offer_types = {
-        "Cash",
-        "Shares",
-        "Mixed",
-        "Other",
-        None,
-    }
-
-    allowed_statuses = {
-        "Announced",
-        "Recommended",
-        "Completed",
-        "Withdrawn",
-        "Other",
-    }
-
-    if (
-        deal.get("buyer_type")
-        not in allowed_buyer_types
-    ):
-        raise ValueError(
-            "Invalid buyer_type"
-        )
-
-    if (
-        deal.get("offer_type")
-        not in allowed_offer_types
-    ):
-        raise ValueError(
-            "Invalid offer_type"
-        )
-
-    if (
-        deal.get("status")
-        not in allowed_statuses
-    ):
-        raise ValueError(
-            "Invalid status"
+            "Invalid confidence"
         )
 
     return confidence
 
 
 # =========================================================
-# DUPLICATES
+# DUPLICATE CHECK
 # =========================================================
 
 def duplicate_exists(
     deal,
     source_url,
 ):
-
-    # Exact source URL.
     r = requests.get(
         f"{SUPABASE_URL}/rest/v1/deals",
         headers=db_headers(),
@@ -801,7 +645,6 @@ def duplicate_exists(
     if r.json():
         return True
 
-    # Exact extracted transaction identity.
     r = requests.get(
         f"{SUPABASE_URL}/rest/v1/deals",
         headers=db_headers(),
@@ -812,10 +655,7 @@ def duplicate_exists(
             "acquirer_name":
             f"eq.{deal['acquirer_name']}",
             "announcement_date":
-            (
-                f"eq."
-                f"{deal['announcement_date']}"
-            ),
+            f"eq.{deal['announcement_date']}",
             "limit": "1",
         },
         timeout=REQUEST_TIMEOUT,
@@ -835,7 +675,6 @@ def insert_deal(
     source_url,
     source_title,
 ):
-
     confidence = float(
         deal["confidence"]
     )
@@ -861,74 +700,74 @@ def insert_deal(
 
     payload = {
         "target_name":
-        deal.get("target_name"),
+            deal.get("target_name"),
 
         "acquirer_name":
-        deal.get("acquirer_name"),
+            deal.get("acquirer_name"),
 
         "announcement_date":
-        deal.get("announcement_date"),
+            deal.get("announcement_date"),
 
         "deal_value_gbp":
-        deal.get("deal_value_gbp"),
+            deal.get("deal_value_gbp"),
 
         "sector":
-        deal.get("sector"),
+            deal.get("sector"),
 
         "buyer_type":
-        deal.get("buyer_type"),
+            deal.get("buyer_type"),
 
         "acquirer_country":
-        deal.get("acquirer_country"),
+            deal.get("acquirer_country"),
 
         "offer_type":
-        deal.get("offer_type"),
+            deal.get("offer_type"),
 
         "offer_price":
-        deal.get("offer_price"),
+            deal.get("offer_price"),
 
         "offer_price_currency":
-        deal.get(
-            "offer_price_currency"
-        ),
+            deal.get(
+                "offer_price_currency"
+            ),
 
         "premium_percent":
-        deal.get("premium_percent"),
+            deal.get("premium_percent"),
 
         "buyer_advisers":
-        deal.get("buyer_advisers"),
+            deal.get("buyer_advisers"),
 
         "target_advisers":
-        deal.get("target_advisers"),
+            deal.get("target_advisers"),
 
         "status":
-        deal.get("status"),
+            deal.get("status"),
 
         "financing":
-        deal.get("financing"),
+            deal.get("financing"),
 
         "strategic_rationale":
-        deal.get(
-            "strategic_rationale"
-        ),
+            deal.get(
+                "strategic_rationale"
+            ),
 
         "source_url":
-        source_url,
+            source_url,
 
         "source_title":
-        source_title,
+            source_title,
 
         "source_domain":
-        "investegate.co.uk",
+            "investegate.co.uk",
 
         "ai_confidence":
-        confidence,
+            confidence,
 
         "verified":
-        auto_publish,
+            auto_publish,
 
         "auto_publish_eligible":
-        auto_publish,
+            auto_publish,
     }
 
     r = requests.post(
@@ -952,14 +791,8 @@ def insert_deal(
 # =========================================================
 
 def main():
-
     print(
         "UK Deal Pulse weekly update"
-    )
-
-    print(
-        "Discovering current Takeover "
-        "Panel offer periods..."
     )
 
     panel_candidates = (
@@ -971,11 +804,6 @@ def main():
         f"{len(panel_candidates)}"
     )
 
-    print(
-        "Searching recent regulatory "
-        "announcements..."
-    )
-
     announcements = (
         find_candidate_announcements(
             panel_candidates
@@ -983,19 +811,18 @@ def main():
     )
 
     print(
-        f"Potential matching announcements: "
+        f"Potential announcements: "
         f"{len(announcements)}"
     )
 
     already_processed = 0
-    inserted = 0
-    unverified = 0
+    published = 0
+    stored_unverified = 0
     duplicates = 0
     rejected = 0
     errors_count = 0
 
     for item in announcements:
-
         url = item["url"]
         title = item["title"]
 
@@ -1011,29 +838,19 @@ def main():
         print("=" * 70)
 
         try:
-
             if source_already_processed(
                 url
             ):
                 print(
-                    "Already processed."
+                    "Already processed"
                 )
-
                 already_processed += 1
                 continue
-
-            print(
-                "Fetching announcement..."
-            )
 
             source_text = (
                 fetch_announcement_text(
                     url
                 )
-            )
-
-            print(
-                "Extracting with Gemini..."
             )
 
             deal = extract_deal(
@@ -1046,7 +863,7 @@ def main():
             print(
                 json.dumps(
                     deal,
-                    indent=2,
+                    indent=2
                 )
             )
 
@@ -1054,8 +871,7 @@ def main():
                 confidence = validate(
                     deal
                 )
-            except ValueError as exc:
-
+            except Exception as exc:
                 print(
                     f"Rejected: {exc}"
                 )
@@ -1064,7 +880,7 @@ def main():
                     url,
                     title,
                     "rejected",
-                    str(exc),
+                    str(exc)
                 )
 
                 rejected += 1
@@ -1072,32 +888,30 @@ def main():
 
             if duplicate_exists(
                 deal,
-                url,
+                url
             ):
-
                 print(
-                    "Duplicate transaction."
+                    "Duplicate transaction"
                 )
 
                 mark_processed(
                     url,
                     title,
-                    "duplicate",
+                    "duplicate"
                 )
 
                 duplicates += 1
                 continue
 
             if confidence < 0.75:
-
                 print(
-                    "Rejected: low confidence."
+                    "Rejected: low confidence"
                 )
 
                 mark_processed(
                     url,
                     title,
-                    "rejected_low_confidence",
+                    "rejected_low_confidence"
                 )
 
                 rejected += 1
@@ -1106,40 +920,34 @@ def main():
             result = insert_deal(
                 deal,
                 url,
-                title,
+                title
             )
 
-            was_verified = bool(
+            is_verified = bool(
                 result
                 and result[0].get(
                     "verified"
                 )
             )
 
-            if was_verified:
-                inserted += 1
-
+            if is_verified:
+                published += 1
                 print(
-                    "INSERT SUCCESS — "
-                    "published."
+                    "INSERT SUCCESS — published"
                 )
             else:
-                unverified += 1
-
+                stored_unverified += 1
                 print(
-                    "INSERT SUCCESS — "
-                    "stored for review but "
-                    "not published."
+                    "INSERT SUCCESS — unverified"
                 )
 
             mark_processed(
                 url,
                 title,
-                "inserted",
+                "inserted"
             )
 
         except Exception as exc:
-
             errors_count += 1
 
             print(
@@ -1151,13 +959,10 @@ def main():
                     url,
                     title,
                     "error",
-                    str(exc)[:1000],
+                    str(exc)[:1000]
                 )
-            except Exception as log_exc:
-                print(
-                    "Could not write error "
-                    f"log: {log_exc}"
-                )
+            except Exception:
+                pass
 
     print()
     print("=" * 70)
@@ -1170,34 +975,27 @@ def main():
         f"Panel candidates: "
         f"{len(panel_candidates)}"
     )
-
     print(
         f"Potential announcements: "
         f"{len(announcements)}"
     )
-
     print(
         f"Already processed: "
         f"{already_processed}"
     )
-
     print(
-        f"Published: {inserted}"
+        f"Published: {published}"
     )
-
     print(
         f"Stored unverified: "
-        f"{unverified}"
+        f"{stored_unverified}"
     )
-
     print(
         f"Duplicates: {duplicates}"
     )
-
     print(
         f"Rejected: {rejected}"
     )
-
     print(
         f"Errors: {errors_count}"
     )
