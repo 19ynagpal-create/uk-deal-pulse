@@ -355,22 +355,23 @@ async function source(): Promise<Deal[]> {
 }
 
 export interface DealQuery {
-  search?: string;
-  sector?: string;
-  buyerType?: string;
-  status?: string;
-  adviser?: string;
-  minValue?: number;
-  fromDate?: string;
+  search?: string | undefined;
+  sector?: string | undefined;
+  buyerType?: string | undefined;
+  status?: string | undefined;
+  adviser?: string | undefined;
+  minValue?: number | undefined;
+  fromDate?: string | undefined;
   sort?:
     | "newest"
     | "oldest"
     | "largest"
     | "smallest"
     | "premium-high"
-    | "premium-low";
-  page?: number;
-  pageSize?: number;
+    | "premium-low"
+    | undefined;
+  page?: number | undefined;
+  pageSize?: number | undefined;
 }
 
 export interface DealPage {
@@ -427,7 +428,10 @@ export function median(values: number[]): number | null {
   const nums = values.filter((n) => Number.isFinite(n)).sort((a, b) => a - b);
   if (!nums.length) return null;
   const mid = Math.floor(nums.length / 2);
-  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+  if (nums.length % 2) return nums[mid] ?? null;
+  const a = nums[mid - 1] ?? 0;
+  const b = nums[mid] ?? 0;
+  return (a + b) / 2;
 }
 
 export interface HeadlineStats {
@@ -586,7 +590,7 @@ export const dealsRepository = {
       .slice(0, limit);
   },
 
-  async advisers(filters: { sector?: string; fromDate?: string } = {}): Promise<AdviserRow[]> {
+  async advisers(filters: { sector?: string | undefined; fromDate?: string | undefined } = {}): Promise<AdviserRow[]> {
     const all = await source();
     const scoped = all.filter(
       (d) =>

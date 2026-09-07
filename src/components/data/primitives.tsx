@@ -59,7 +59,7 @@ export function StatCard({
 }: {
   label: string;
   value: string;
-  sub?: string;
+  sub?: string | undefined;
 }) {
   return (
     <div className="border border-border bg-card px-4 py-3.5">

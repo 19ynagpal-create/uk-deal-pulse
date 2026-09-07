@@ -302,7 +302,15 @@ function Dashboard() {
   );
 }
 
-function Row({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Row({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string | undefined;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4 py-2.5">
       <dt className="text-muted-foreground">{label}</dt>
