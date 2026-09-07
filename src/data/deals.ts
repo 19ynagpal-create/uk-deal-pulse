@@ -1,31 +1,37 @@
 /**
- * DEVELOPMENT SAMPLE DATA
- * -----------------------
- * These records are illustrative placeholders used while the platform is
- * wired up. They are NOT UK Deal Pulse statistics and must be replaced by
- * database-backed records before publication.
+ * Deal data layer.
  *
- * All access below goes through the async `dealsRepository` functions so the
- * data layer can be swapped for a database client without touching the UI.
+ * All records come from the `deals` table in the project database and only
+ * rows with `verified = true` are ever exposed (enforced both here and by the
+ * database access policy). If no verified records exist, every accessor
+ * returns an empty result so the UI can show an honest empty state instead of
+ * fabricated statistics.
  */
 
+import { supabase } from "@/integrations/supabase/client";
+
 export type BuyerType = "Strategic" | "Private Equity";
-export type DealStatus = "Announced" | "Recommended" | "Completed" | "Lapsed";
+export type DealStatus =
+  | "Announced"
+  | "Recommended"
+  | "Completed"
+  | "Withdrawn"
+  | "Other";
 
 export interface Deal {
   id: string;
   target: string;
-  targetTicker?: string;
   acquirer: string;
   acquirerCountry: string;
   sector: string;
   announcementDate: string; // ISO date
   dealValueGbpM: number | null;
-  offerPricePence: number | null;
+  offerPrice: number | null;
+  offerPriceCurrency: string | null;
   premiumPct: number | null;
   buyerType: BuyerType;
   status: DealStatus;
-  consideration: string | null;
+  offerType: string | null;
   rationale: string | null;
   financing: string | null;
   targetAdvisers: string[];
@@ -33,325 +39,94 @@ export interface Deal {
   sources: { label: string; url: string }[];
 }
 
-const rawDeals: Deal[] = [
-  {
-    id: "sample-anglo-pearl",
-    target: "Northgate Industrials plc",
-    targetTicker: "NGI.L",
-    acquirer: "Pearl Ridge Partners",
-    acquirerCountry: "United States",
-    sector: "Industrials",
-    announcementDate: "2026-09-02",
-    dealValueGbpM: 4120,
-    offerPricePence: 985,
-    premiumPct: 38.4,
-    buyerType: "Private Equity",
-    status: "Recommended",
-    consideration: "Cash",
-    rationale:
-      "Sample record. The buyer is described as seeking a UK-listed platform in specialist flow-control manufacturing, with the target's board citing a persistent listed-market valuation discount.",
-    financing: "Equity from committed funds alongside senior debt facilities.",
-    targetAdvisers: ["Rothbury & Co.", "Kingsway Securities"],
-    buyerAdvisers: ["Ardenmore Advisory"],
-    sources: [{ label: "Rule 2.7 announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-caledon-vantage",
-    target: "Caledon Water Group plc",
-    acquirer: "Vantage Infrastructure Holdings",
-    acquirerCountry: "Australia",
-    sector: "Utilities",
-    announcementDate: "2026-08-28",
-    dealValueGbpM: 2870,
-    offerPricePence: 412,
-    premiumPct: 26.1,
-    buyerType: "Private Equity",
-    status: "Announced",
-    consideration: "Cash",
-    rationale:
-      "Sample record. Long-duration infrastructure buyer acquiring a regulated UK utility asset base.",
-    financing: null,
-    targetAdvisers: ["Kingsway Securities"],
-    buyerAdvisers: ["Halberd Partners", "Rothbury & Co."],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-loxley-mercia",
-    target: "Loxley Software plc",
-    acquirer: "Mercia Technologies Inc.",
-    acquirerCountry: "United States",
-    sector: "Technology",
-    announcementDate: "2026-08-19",
-    dealValueGbpM: 1640,
-    offerPricePence: 730,
-    premiumPct: 44.9,
-    buyerType: "Strategic",
-    status: "Recommended",
-    consideration: "Cash and shares",
-    rationale:
-      "Sample record. Strategic acquirer consolidating adjacent enterprise workflow software capability.",
-    financing: "Existing cash resources and a new term loan.",
-    targetAdvisers: ["Ardenmore Advisory"],
-    buyerAdvisers: ["Stanhope Capital Advisers"],
-    sources: [{ label: "Offer announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-brackenhall",
-    target: "Brackenhall Retail plc",
-    acquirer: "Fernhurst Capital",
-    acquirerCountry: "United Kingdom",
-    sector: "Consumer",
-    announcementDate: "2026-08-06",
-    dealValueGbpM: 690,
-    offerPricePence: 158,
-    premiumPct: 31.7,
-    buyerType: "Private Equity",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. Take-private of a mid-cap specialist retailer.",
-    financing: null,
-    targetAdvisers: ["Kingsway Securities"],
-    buyerAdvisers: ["Halberd Partners"],
-    sources: [{ label: "Scheme document (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-orwell-nord",
-    target: "Orwell Pharma plc",
-    acquirer: "Nordwerk Pharma AG",
-    acquirerCountry: "Germany",
-    sector: "Healthcare",
-    announcementDate: "2026-07-22",
-    dealValueGbpM: 3310,
-    offerPricePence: 1240,
-    premiumPct: 52.3,
-    buyerType: "Strategic",
-    status: "Announced",
-    consideration: "Cash",
-    rationale: "Sample record. Pipeline-driven acquisition in specialty therapeutics.",
-    financing: "Bridge facility to be refinanced in the bond market.",
-    targetAdvisers: ["Rothbury & Co.", "Stanhope Capital Advisers"],
-    buyerAdvisers: ["Ardenmore Advisory"],
-    sources: [{ label: "Rule 2.7 announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-tarnbridge",
-    target: "Tarnbridge Financial plc",
-    acquirer: "Aldgate Mutual",
-    acquirerCountry: "United Kingdom",
-    sector: "Financials",
-    announcementDate: "2026-07-09",
-    dealValueGbpM: 1180,
-    offerPricePence: 296,
-    premiumPct: 18.2,
-    buyerType: "Strategic",
-    status: "Completed",
-    consideration: "Shares",
-    rationale: "Sample record. Domestic consolidation of savings and protection books.",
-    financing: null,
-    targetAdvisers: ["Halberd Partners"],
-    buyerAdvisers: ["Kingsway Securities"],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-westmarch",
-    target: "Westmarch Energy plc",
-    acquirer: "Sable Point Energy Partners",
-    acquirerCountry: "Canada",
-    sector: "Energy",
-    announcementDate: "2026-06-25",
-    dealValueGbpM: 2240,
-    offerPricePence: 505,
-    premiumPct: 22.8,
-    buyerType: "Private Equity",
-    status: "Announced",
-    consideration: "Cash",
-    rationale: "Sample record. Acquisition of North Sea and onshore renewables portfolio.",
-    financing: null,
-    targetAdvisers: ["Stanhope Capital Advisers"],
-    buyerAdvisers: ["Rothbury & Co."],
-    sources: [{ label: "Offer announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-halewood",
-    target: "Halewood Logistics plc",
-    acquirer: "Continental Freight Group",
-    acquirerCountry: "Netherlands",
-    sector: "Industrials",
-    announcementDate: "2026-06-11",
-    dealValueGbpM: 845,
-    offerPricePence: 214,
-    premiumPct: 29.5,
-    buyerType: "Strategic",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. European network expansion into UK road freight.",
-    financing: "Funded from existing facilities.",
-    targetAdvisers: ["Ardenmore Advisory"],
-    buyerAdvisers: ["Halberd Partners"],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-pennfield",
-    target: "Pennfield Media plc",
-    acquirer: "Crestline Media Partners",
-    acquirerCountry: "United States",
-    sector: "Media",
-    announcementDate: "2026-05-28",
-    dealValueGbpM: 512,
-    offerPricePence: 88,
-    premiumPct: 61.4,
-    buyerType: "Private Equity",
-    status: "Lapsed",
-    consideration: "Cash",
-    rationale: "Sample record. Offer subsequently lapsed following shareholder opposition.",
-    financing: null,
-    targetAdvisers: ["Kingsway Securities"],
-    buyerAdvisers: ["Stanhope Capital Advisers"],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-gravesend",
-    target: "Gravesend Chemicals plc",
-    acquirer: "Toyo Speciality Holdings",
-    acquirerCountry: "Japan",
-    sector: "Materials",
-    announcementDate: "2026-05-14",
-    dealValueGbpM: 1990,
-    offerPricePence: 640,
-    premiumPct: 34.2,
-    buyerType: "Strategic",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. Vertical integration into speciality chemical intermediates.",
-    financing: null,
-    targetAdvisers: ["Rothbury & Co."],
-    buyerAdvisers: ["Ardenmore Advisory", "Halberd Partners"],
-    sources: [{ label: "Scheme document (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-ashcombe",
-    target: "Ashcombe Housing plc",
-    acquirer: "Bramwell Real Assets",
-    acquirerCountry: "United Kingdom",
-    sector: "Real Estate",
-    announcementDate: "2026-04-30",
-    dealValueGbpM: 1420,
-    offerPricePence: 372,
-    premiumPct: 15.9,
-    buyerType: "Private Equity",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. NAV-discount driven take-private of a listed housing REIT.",
-    financing: null,
-    targetAdvisers: ["Halberd Partners"],
-    buyerAdvisers: ["Kingsway Securities"],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-marloes",
-    target: "Marloes Telecom plc",
-    acquirer: "Iberia Connect S.A.",
-    acquirerCountry: "Spain",
-    sector: "Telecommunications",
-    announcementDate: "2026-04-16",
-    dealValueGbpM: 3760,
-    offerPricePence: 149,
-    premiumPct: 41.0,
-    buyerType: "Strategic",
-    status: "Announced",
-    consideration: "Cash and shares",
-    rationale: "Sample record. Cross-border fixed-line and fibre consolidation.",
-    financing: "Rights issue proceeds and committed acquisition facility.",
-    targetAdvisers: ["Stanhope Capital Advisers", "Rothbury & Co."],
-    buyerAdvisers: ["Ardenmore Advisory"],
-    sources: [{ label: "Rule 2.7 announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-quarrydale",
-    target: "Quarrydale Leisure plc",
-    acquirer: "Northstar Hospitality",
-    acquirerCountry: "United Kingdom",
-    sector: "Consumer",
-    announcementDate: "2026-03-26",
-    dealValueGbpM: 380,
-    offerPricePence: 96,
-    premiumPct: 27.3,
-    buyerType: "Strategic",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. Bolt-on acquisition of a regional leisure estate.",
-    financing: null,
-    targetAdvisers: ["Kingsway Securities"],
-    buyerAdvisers: ["Halberd Partners"],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-eastbrook",
-    target: "Eastbrook Insurance plc",
-    acquirer: "Granite Harbour Capital",
-    acquirerCountry: "United States",
-    sector: "Financials",
-    announcementDate: "2026-03-05",
-    dealValueGbpM: 2610,
-    offerPricePence: 458,
-    premiumPct: 33.6,
-    buyerType: "Private Equity",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. Specialty insurance platform acquisition.",
-    financing: null,
-    targetAdvisers: ["Ardenmore Advisory"],
-    buyerAdvisers: ["Stanhope Capital Advisers"],
-    sources: [{ label: "Scheme document (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-fenwick",
-    target: "Fenwick Analytics plc",
-    acquirer: "Datamere Group",
-    acquirerCountry: "United States",
-    sector: "Technology",
-    announcementDate: "2026-02-12",
-    dealValueGbpM: 960,
-    offerPricePence: 1105,
-    premiumPct: 47.8,
-    buyerType: "Strategic",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. Data infrastructure acquisition to extend UK footprint.",
-    financing: null,
-    targetAdvisers: ["Rothbury & Co."],
-    buyerAdvisers: ["Kingsway Securities"],
-    sources: [{ label: "Company announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
-  {
-    id: "sample-varley",
-    target: "Varley Aerospace plc",
-    acquirer: "Lockridge Defence Systems",
-    acquirerCountry: "United States",
-    sector: "Industrials",
-    announcementDate: "2026-01-22",
-    dealValueGbpM: 5240,
-    offerPricePence: 1580,
-    premiumPct: 36.1,
-    buyerType: "Strategic",
-    status: "Completed",
-    consideration: "Cash",
-    rationale: "Sample record. Defence supply-chain consolidation subject to national-security review.",
-    financing: "Cash on balance sheet.",
-    targetAdvisers: ["Stanhope Capital Advisers"],
-    buyerAdvisers: ["Rothbury & Co.", "Ardenmore Advisory"],
-    sources: [{ label: "Rule 2.7 announcement (sample)", url: "https://www.londonstockexchange.com/news" }],
-  },
+/** Data is live from the database, never sample records. */
+export const IS_SAMPLE_DATA = false;
+
+const UNKNOWN_SECTOR = "Unclassified";
+
+const STATUSES: DealStatus[] = [
+  "Announced",
+  "Recommended",
+  "Completed",
+  "Withdrawn",
+  "Other",
 ];
 
-export const IS_SAMPLE_DATA = true;
+type DealRow = {
+  id: string;
+  target_name: string;
+  acquirer_name: string;
+  announcement_date: string;
+  deal_value_gbp: number | string | null;
+  sector: string | null;
+  buyer_type: string | null;
+  acquirer_country: string | null;
+  offer_type: string | null;
+  offer_price: number | string | null;
+  offer_price_currency: string | null;
+  premium_percent: number | string | null;
+  buyer_advisers: string[] | null;
+  target_advisers: string[] | null;
+  status: string | null;
+  financing: string | null;
+  strategic_rationale: string | null;
+  source_url: string | null;
+  source_title: string | null;
+  source_domain: string | null;
+};
+
+const num = (v: number | string | null): number | null => {
+  if (v == null) return null;
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+function mapRow(row: DealRow): Deal {
+  const valueGbp = num(row.deal_value_gbp);
+  const status = STATUSES.includes(row.status as DealStatus)
+    ? (row.status as DealStatus)
+    : "Other";
+  const sourceUrl = row.source_url ?? "";
+  return {
+    id: row.id,
+    target: row.target_name,
+    acquirer: row.acquirer_name,
+    acquirerCountry: row.acquirer_country ?? "Not disclosed",
+    sector: row.sector ?? UNKNOWN_SECTOR,
+    announcementDate: row.announcement_date,
+    dealValueGbpM: valueGbp == null ? null : valueGbp / 1_000_000,
+    offerPrice: num(row.offer_price),
+    offerPriceCurrency: row.offer_price_currency,
+    premiumPct: num(row.premium_percent),
+    buyerType: row.buyer_type === "Private Equity" ? "Private Equity" : "Strategic",
+    status,
+    offerType: row.offer_type,
+    rationale: row.strategic_rationale,
+    financing: row.financing,
+    targetAdvisers: (row.target_advisers ?? []).filter(Boolean),
+    buyerAdvisers: (row.buyer_advisers ?? []).filter(Boolean),
+    sources: sourceUrl
+      ? [{ label: row.source_title ?? row.source_domain ?? "Source", url: sourceUrl }]
+      : [],
+  };
+}
+
+const SELECT_COLUMNS =
+  "id,target_name,acquirer_name,announcement_date,deal_value_gbp,sector,buyer_type,acquirer_country,offer_type,offer_price,offer_price_currency,premium_percent,buyer_advisers,target_advisers,status,financing,strategic_rationale,source_url,source_title,source_domain";
 
 const byDateDesc = (a: Deal, b: Deal) =>
   b.announcementDate.localeCompare(a.announcementDate);
 
-/** Simulated async boundary so a database client can drop in unchanged. */
+/** Verified records only. */
 async function source(): Promise<Deal[]> {
-  return [...rawDeals].sort(byDateDesc);
+  const { data, error } = await supabase
+    .from("deals")
+    .select(SELECT_COLUMNS)
+    .eq("verified", true)
+    .order("announcement_date", { ascending: false })
+    .limit(2000);
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as unknown as DealRow[]).map(mapRow).sort(byDateDesc);
 }
 
 export interface DealQuery {
@@ -479,8 +254,14 @@ export const dealsRepository = {
   },
 
   async getById(id: string): Promise<Deal | null> {
-    const all = await source();
-    return all.find((d) => d.id === id) ?? null;
+    const { data, error } = await supabase
+      .from("deals")
+      .select(SELECT_COLUMNS)
+      .eq("verified", true)
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    return data ? mapRow(data as unknown as DealRow) : null;
   },
 
   async headlineStats(): Promise<HeadlineStats> {
@@ -499,10 +280,7 @@ export const dealsRepository = {
   async weeklySummary(): Promise<WeeklySummary> {
     const all = await source();
     const windowStart = daysAgoISO(7);
-    let deals = all.filter((d) => d.announcementDate >= windowStart);
-    // Sample dataset fallback: show the most recent records when the rolling
-    // seven-day window is empty, clearly labelled in the UI.
-    if (!deals.length) deals = all.slice(0, 3);
+    const deals = all.filter((d) => d.announcementDate >= windowStart);
     const sectors = new Map<string, number>();
     deals.forEach((d) => sectors.set(d.sector, (sectors.get(d.sector) ?? 0) + 1));
     const mostActiveSector =
@@ -537,9 +315,13 @@ export const dealsRepository = {
 
   async bySector() {
     const all = await source();
-    const map = new Map<string, { sector: string; deals: number; value: number; premiums: number[] }>();
+    const map = new Map<
+      string,
+      { sector: string; deals: number; value: number; premiums: number[] }
+    >();
     all.forEach((d) => {
-      const row = map.get(d.sector) ?? { sector: d.sector, deals: 0, value: 0, premiums: [] };
+      const row =
+        map.get(d.sector) ?? { sector: d.sector, deals: 0, value: 0, premiums: [] };
       row.deals += 1;
       row.value += d.dealValueGbpM ?? 0;
       if (d.premiumPct != null) row.premiums.push(d.premiumPct);
@@ -550,7 +332,7 @@ export const dealsRepository = {
         sector: r.sector,
         deals: r.deals,
         value: r.value,
-        medianPremium: median(r.premiums) ?? 0,
+        medianPremiumPct: median(r.premiums),
       }))
       .sort((a, b) => b.value - a.value);
   },
@@ -572,7 +354,11 @@ export const dealsRepository = {
     const all = await source();
     const uk = all.filter((d) => d.acquirerCountry === "United Kingdom");
     return [
-      { origin: "UK buyers", deals: uk.length, value: uk.reduce((s, d) => s + (d.dealValueGbpM ?? 0), 0) },
+      {
+        origin: "UK buyers",
+        deals: uk.length,
+        value: uk.reduce((s, d) => s + (d.dealValueGbpM ?? 0), 0),
+      },
       {
         origin: "Overseas buyers",
         deals: all.length - uk.length,
@@ -590,7 +376,9 @@ export const dealsRepository = {
       .slice(0, limit);
   },
 
-  async advisers(filters: { sector?: string | undefined; fromDate?: string | undefined } = {}): Promise<AdviserRow[]> {
+  async advisers(
+    filters: { sector?: string | undefined; fromDate?: string | undefined } = {},
+  ): Promise<AdviserRow[]> {
     const all = await source();
     const scoped = all.filter(
       (d) =>
@@ -641,8 +429,16 @@ export function formatPremium(p: number | null | undefined) {
   return p == null ? NOT_DISCLOSED : `${p.toFixed(1)}%`;
 }
 
-export function formatPence(p: number | null | undefined) {
-  return p == null ? NOT_DISCLOSED : `${p.toFixed(0)}p`;
+export function formatOfferPrice(
+  price: number | null | undefined,
+  currency?: string | null,
+) {
+  if (price == null) return NOT_DISCLOSED;
+  const code = (currency ?? "GBp").toUpperCase();
+  if (code === "GBP") return `£${price.toFixed(2)}`;
+  if (code === "GBP" || code === "GBX" || code === "GBp".toUpperCase())
+    return `${price.toFixed(0)}p`;
+  return `${price.toFixed(2)} ${code}`;
 }
 
 export function formatDate(iso: string) {
