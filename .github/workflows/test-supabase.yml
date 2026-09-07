@@ -1,0 +1,30 @@
+name: Test Supabase Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check Supabase secrets
+        run: |
+          if [ -z "${{ secrets.SUPABASE_URL }}" ]; then
+            echo "SUPABASE_URL missing"
+            exit 1
+          fi
+
+          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "SUPABASE_SERVICE_ROLE_KEY missing"
+            exit 1
+          fi
+
+          echo "Supabase secrets exist"
+
+      - name: Test database connection
+        run: |
+          curl -sS \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/deals?select=target_name&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}"
