@@ -10,33 +10,102 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdvisersRouteImport } from './routes/advisers'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as DealsIndexRouteImport } from './routes/deals.index'
+import { Route as DealsDealIdRouteImport } from './routes/deals.$dealId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdvisersRoute = AdvisersRouteImport.update({
+  id: '/advisers',
+  path: '/advisers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MethodologyRoute = MethodologyRouteImport.update({
+  id: '/methodology',
+  path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DealsIndexRoute = DealsIndexRouteImport.update({
+  id: '/deals/',
+  path: '/deals/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DealsDealIdRoute = DealsDealIdRouteImport.update({
+  id: '/deals/$dealId',
+  path: '/deals/$dealId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/advisers': typeof AdvisersRoute
+  '/analytics': typeof AnalyticsRoute
+  '/methodology': typeof MethodologyRoute
+  '/deals/$dealId': typeof DealsDealIdRoute
+  '/deals/': typeof DealsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/advisers': typeof AdvisersRoute
+  '/analytics': typeof AnalyticsRoute
+  '/methodology': typeof MethodologyRoute
+  '/deals/$dealId': typeof DealsDealIdRoute
+  '/deals': typeof DealsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/advisers': typeof AdvisersRoute
+  '/analytics': typeof AnalyticsRoute
+  '/methodology': typeof MethodologyRoute
+  '/deals/$dealId': typeof DealsDealIdRoute
+  '/deals/': typeof DealsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/advisers'
+    | '/analytics'
+    | '/methodology'
+    | '/deals/$dealId'
+    | '/deals/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/advisers'
+    | '/analytics'
+    | '/methodology'
+    | '/deals/$dealId'
+    | '/deals'
+  id:
+    | '__root__'
+    | '/'
+    | '/advisers'
+    | '/analytics'
+    | '/methodology'
+    | '/deals/$dealId'
+    | '/deals/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdvisersRoute: typeof AdvisersRoute
+  AnalyticsRoute: typeof AnalyticsRoute
+  MethodologyRoute: typeof MethodologyRoute
+  DealsDealIdRoute: typeof DealsDealIdRoute
+  DealsIndexRoute: typeof DealsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +117,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/advisers': {
+      id: '/advisers'
+      path: '/advisers'
+      fullPath: '/advisers'
+      preLoaderRoute: typeof AdvisersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/methodology': {
+      id: '/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deals/': {
+      id: '/deals/'
+      path: '/deals'
+      fullPath: '/deals/'
+      preLoaderRoute: typeof DealsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/deals/$dealId': {
+      id: '/deals/$dealId'
+      path: '/deals/$dealId'
+      fullPath: '/deals/$dealId'
+      preLoaderRoute: typeof DealsDealIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdvisersRoute: AdvisersRoute,
+  AnalyticsRoute: AnalyticsRoute,
+  MethodologyRoute: MethodologyRoute,
+  DealsDealIdRoute: DealsDealIdRoute,
+  DealsIndexRoute: DealsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
