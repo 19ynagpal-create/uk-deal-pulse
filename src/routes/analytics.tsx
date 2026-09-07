@@ -8,6 +8,7 @@ import {
   LoadingRows,
   PageHeader,
   Panel,
+  NoDataNotice,
 } from "@/components/data/primitives";
 
 export const Route = createFileRoute("/analytics")({
@@ -45,6 +46,8 @@ function AnalyticsPage() {
     queryFn: () => dealsRepository.largestDeals(8),
   });
 
+  const isEmpty = monthly.data?.length === 0;
+
   const state = (q: { isPending: boolean; isError: boolean }) =>
     q.isPending ? <LoadingRows rows={5} /> : q.isError ? <ErrorState /> : null;
 
@@ -56,6 +59,9 @@ function AnalyticsPage() {
       />
 
 
+      {isEmpty && <NoDataNotice className="mt-5" />}
+
+      {!isEmpty && (
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel title="Deal activity over time" note="Tracked transactions by month">
           {state(monthly) ??
