@@ -83,9 +83,9 @@ function AnalyticsPage() {
           {state(sectors) ??
             (sectors.data && (
               <CategoryBars
-                data={[...sectors.data].sort((a, b) => b.medianPremium - a.medianPremium)}
+                data={[...sectors.data].sort((a, b) => b.medianPremiumPct - a.medianPremiumPct)}
                 categoryKey="sector"
-                valueKey="medianPremium"
+                valueKey="medianPremiumPct"
                 name="Median premium"
                 formatter={(v) => `${v.toFixed(0)}%`}
               />
