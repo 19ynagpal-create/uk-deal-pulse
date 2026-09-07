@@ -86,24 +86,28 @@ function DealsPage() {
 
           <Filter
             label="Sector"
+            allLabel="All sectors"
             value={query.sector ?? "all"}
             options={facets.data?.sectors ?? []}
             onChange={(v) => update({ sector: v })}
           />
           <Filter
             label="Buyer type"
+            allLabel="All buyer types"
             value={query.buyerType ?? "all"}
             options={facets.data?.buyerTypes ?? []}
             onChange={(v) => update({ buyerType: v })}
           />
           <Filter
             label="Status"
+            allLabel="All statuses"
             value={query.status ?? "all"}
             options={facets.data?.statuses ?? []}
             onChange={(v) => update({ status: v })}
           />
           <Filter
             label="Adviser"
+            allLabel="All advisers"
             value={query.adviser ?? "all"}
             options={facets.data?.advisers ?? []}
             onChange={(v) => update({ adviser: v })}
@@ -189,11 +193,13 @@ function DealsPage() {
 
 function Filter({
   label,
+  allLabel,
   value,
   options,
   onChange,
 }: {
   label: string;
+  allLabel: string;
   value: string;
   options: string[];
   onChange: (v: string) => void;
@@ -203,7 +209,10 @@ function Filter({
       label={label}
       value={value}
       onChange={onChange}
-      options={[{ value: "all", label: `All ${label.toLowerCase()}s` }, ...options.map((o) => ({ value: o, label: o }))]}
+      options={[
+        { value: "all", label: allLabel },
+        ...options.map((o) => ({ value: o, label: o })),
+      ]}
     />
   );
 }
