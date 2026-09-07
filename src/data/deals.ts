@@ -434,6 +434,7 @@ export function formatOfferPrice(
   currency?: string | null,
 ) {
   if (price == null) return NOT_DISCLOSED;
+  if ((currency ?? "") === "GBp") return `${price.toFixed(0)}p`;
   const code = (currency ?? "GBX").toUpperCase();
   if (code === "GBX" || code === "PENCE" || code === "P") return `${price.toFixed(0)}p`;
   if (code === "GBP") return `£${price.toFixed(2)}`;
