@@ -14,7 +14,120 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      deals: {
+        Row: {
+          acquirer_country: string | null
+          acquirer_name: string
+          ai_confidence: number | null
+          announcement_date: string
+          auto_publish_eligible: boolean
+          buyer_advisers: string[]
+          buyer_type: string | null
+          created_at: string
+          deal_value_gbp: number | null
+          financing: string | null
+          id: string
+          offer_price: number | null
+          offer_price_currency: string | null
+          offer_type: string | null
+          premium_percent: number | null
+          sector: string | null
+          source_domain: string | null
+          source_title: string | null
+          source_url: string
+          status: string
+          strategic_rationale: string | null
+          target_advisers: string[]
+          target_name: string
+          updated_at: string
+          verified: boolean
+        }
+        Insert: {
+          acquirer_country?: string | null
+          acquirer_name: string
+          ai_confidence?: number | null
+          announcement_date: string
+          auto_publish_eligible?: boolean
+          buyer_advisers?: string[]
+          buyer_type?: string | null
+          created_at?: string
+          deal_value_gbp?: number | null
+          financing?: string | null
+          id?: string
+          offer_price?: number | null
+          offer_price_currency?: string | null
+          offer_type?: string | null
+          premium_percent?: number | null
+          sector?: string | null
+          source_domain?: string | null
+          source_title?: string | null
+          source_url: string
+          status?: string
+          strategic_rationale?: string | null
+          target_advisers?: string[]
+          target_name: string
+          updated_at?: string
+          verified?: boolean
+        }
+        Update: {
+          acquirer_country?: string | null
+          acquirer_name?: string
+          ai_confidence?: number | null
+          announcement_date?: string
+          auto_publish_eligible?: boolean
+          buyer_advisers?: string[]
+          buyer_type?: string | null
+          created_at?: string
+          deal_value_gbp?: number | null
+          financing?: string | null
+          id?: string
+          offer_price?: number | null
+          offer_price_currency?: string | null
+          offer_type?: string | null
+          premium_percent?: number | null
+          sector?: string | null
+          source_domain?: string | null
+          source_title?: string | null
+          source_url?: string
+          status?: string
+          strategic_rationale?: string | null
+          target_advisers?: string[]
+          target_name?: string
+          updated_at?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
+      processed_sources: {
+        Row: {
+          discovered_at: string
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          processing_status: string
+          source_title: string | null
+          source_url: string
+        }
+        Insert: {
+          discovered_at?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          processing_status?: string
+          source_title?: string | null
+          source_url: string
+        }
+        Update: {
+          discovered_at?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          processing_status?: string
+          source_title?: string | null
+          source_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
