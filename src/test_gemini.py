@@ -1,6 +1,9 @@
 import os
 import json
+import time
+
 from google import genai
+from google.genai import errors
 
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
@@ -47,13 +50,32 @@ Announcement:
 {announcement}
 """
 
-response = client.models.generate_content(
-    model="gemini-3.6-flash",
-    contents=prompt,
-    config={
-        "response_mime_type": "application/json"
-    },
-)
+response = None
+
+for attempt in range(5):
+    try:
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json"
+            },
+        )
+        break
+
+    except errors.ServerError as e:
+        if attempt == 4:
+            raise
+
+        wait_seconds = 10 * (attempt + 1)
+        print(
+            f"Gemini temporarily unavailable. "
+            f"Retrying in {wait_seconds} seconds..."
+        )
+        time.sleep(wait_seconds)
+
+if response is None:
+    raise RuntimeError("Gemini did not return a response.")
 
 data = json.loads(response.text)
 
