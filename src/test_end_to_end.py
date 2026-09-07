@@ -1,8 +1,9 @@
 import os
 import json
 import time
-import requests
+from datetime import datetime
 
+import requests
 from google import genai
 from google.genai import errors
 
@@ -42,6 +43,50 @@ def headers():
     }
 
 
+def normalize_date(value):
+    if not value:
+        return None
+
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        pass
+
+    try:
+        return datetime.strptime(value, "%d %B %Y").date().isoformat()
+    except ValueError:
+        pass
+
+    raise ValueError(f"Unsupported date format: {value}")
+
+
+def normalize_confidence(value):
+    if value is None:
+        return 0.0
+
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    if isinstance(value, str):
+        v = value.strip().lower()
+
+        mapping = {
+            "high": 0.95,
+            "medium": 0.80,
+            "low": 0.60,
+        }
+
+        if v in mapping:
+            return mapping[v]
+
+        try:
+            return float(v)
+        except ValueError:
+            pass
+
+    raise ValueError(f"Unsupported confidence value: {value}")
+
+
 def extract_deal():
     prompt = f"""
 You are the structured-data extraction engine for UK Deal Pulse.
@@ -51,6 +96,11 @@ Use only the supplied source text.
 If a field is unsupported, return null.
 Never guess.
 Never calculate a premium unless explicitly stated.
+
+IMPORTANT FORMAT RULES:
+- announcement_date MUST be YYYY-MM-DD
+- confidence MUST be a decimal number from 0 to 1
+- do not return "High", "Medium", or "Low"
 
 Return valid JSON only with these fields:
 
@@ -102,38 +152,18 @@ Source:
                 contents=prompt,
                 config={"response_mime_type": "application/json"},
             )
+
             return json.loads(response.text)
 
         except errors.ServerError:
             if attempt == 4:
                 raise
+
             wait = 10 * (attempt + 1)
             print(f"Gemini unavailable. Retrying in {wait}s...")
             time.sleep(wait)
 
     raise RuntimeError("Gemini extraction failed")
-
-
-def duplicate_exists(deal):
-    params = {
-        "select": "id,target_name,acquirer_name,announcement_date",
-        "or": (
-            f"(source_url.eq.{SOURCE_URL},"
-            f"and(target_name.eq.{deal['target_name']},"
-            f"acquirer_name.eq.{deal['acquirer_name']},"
-            f"announcement_date.eq.{deal['announcement_date']}))"
-        ),
-        "limit": "1",
-    }
-
-    r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/deals",
-        headers=headers(),
-        params=params,
-        timeout=30,
-    )
-    r.raise_for_status()
-    return bool(r.json())
 
 
 def validate(deal):
@@ -147,15 +177,56 @@ def validate(deal):
         if not deal.get(field):
             raise ValueError(f"Missing required field: {field}")
 
-    confidence = deal.get("confidence")
-    if confidence is None:
-        raise ValueError("Missing confidence")
+    deal["announcement_date"] = normalize_date(
+        deal["announcement_date"]
+    )
 
-    return float(confidence)
+    deal["confidence"] = normalize_confidence(
+        deal.get("confidence")
+    )
+
+    return deal
+
+
+def duplicate_exists(deal):
+    params = {
+        "select": "id,target_name,acquirer_name,announcement_date,source_url",
+        "source_url": f"eq.{SOURCE_URL}",
+        "limit": "1",
+    }
+
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/deals",
+        headers=headers(),
+        params=params,
+        timeout=30,
+    )
+    r.raise_for_status()
+
+    if r.json():
+        return True
+
+    params = {
+        "select": "id",
+        "target_name": f"eq.{deal['target_name']}",
+        "acquirer_name": f"eq.{deal['acquirer_name']}",
+        "announcement_date": f"eq.{deal['announcement_date']}",
+        "limit": "1",
+    }
+
+    r = requests.get(
+        f"{SUPABASE_URL}/rest/v1/deals",
+        headers=headers(),
+        params=params,
+        timeout=30,
+    )
+    r.raise_for_status()
+
+    return bool(r.json())
 
 
 def insert_deal(deal):
-    confidence = validate(deal)
+    confidence = deal["confidence"]
 
     payload = {
         "target_name": deal.get("target_name"),
@@ -184,23 +255,30 @@ def insert_deal(deal):
 
     r = requests.post(
         f"{SUPABASE_URL}/rest/v1/deals",
-        headers={**headers(), "Prefer": "return=representation"},
+        headers={
+            **headers(),
+            "Prefer": "return=representation",
+        },
         json=payload,
         timeout=30,
     )
-    r.raise_for_status()
 
+    r.raise_for_status()
     return r.json()
 
 
 def main():
     print("Extracting deal with Gemini...")
+
     deal = extract_deal()
 
     print("EXTRACTED:")
     print(json.dumps(deal, indent=2))
 
-    validate(deal)
+    deal = validate(deal)
+
+    print("NORMALIZED:")
+    print(json.dumps(deal, indent=2))
 
     if duplicate_exists(deal):
         print("DUPLICATE: deal already exists")
