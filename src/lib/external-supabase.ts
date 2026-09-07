@@ -26,17 +26,10 @@ const FALLBACK_URL = "https://cczlwhdlsfjhehhkoget.supabase.co";
 const FALLBACK_PUBLISHABLE_KEY = "sb_publishable_7p33M4L9f7pSattJfiE9PA_wJZiWLOa";
 
 const EXTERNAL_SUPABASE_URL =
-  import.meta.env["VITE_EXTERNAL_SUPABASE_URL"] ||
-  import.meta.env["SUPABASE_URL"] ||
-  (typeof process !== "undefined" ? process.env["SUPABASE_URL"] : undefined) ||
-  FALLBACK_URL;
+  import.meta.env["VITE_EXTERNAL_SUPABASE_URL"] || FALLBACK_URL;
 
 const EXTERNAL_SUPABASE_PUBLISHABLE_KEY =
   import.meta.env["VITE_EXTERNAL_SUPABASE_PUBLISHABLE_KEY"] ||
-  import.meta.env["SUPABASE_PUBLISHABLE_KEY"] ||
-  (typeof process !== "undefined"
-    ? process.env["SUPABASE_PUBLISHABLE_KEY"]
-    : undefined) ||
   FALLBACK_PUBLISHABLE_KEY;
 
 function isNewSupabaseApiKey(value: string): boolean {
