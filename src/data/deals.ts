@@ -1,14 +1,15 @@
 /**
  * Deal data layer.
  *
- * All records come from the `deals` table in the project database and only
- * rows with `verified = true` are ever exposed (enforced both here and by the
- * database access policy). If no verified records exist, every accessor
- * returns an empty result so the UI can show an honest empty state instead of
- * fabricated statistics.
+ * All records come from the `deals` table in the owner's EXTERNAL Supabase
+ * project (see src/lib/external-supabase.ts) — Lovable Cloud is no longer
+ * used for deal reads. Only rows with `verified = true` are ever exposed
+ * (enforced both here and by the database access policy). If no verified
+ * records exist, every accessor returns an empty result so the UI can show
+ * an honest empty state instead of fabricated statistics.
  */
 
-import { supabase } from "@/integrations/supabase/client";
+import { externalSupabase as supabase } from "@/lib/external-supabase";
 
 export type BuyerType = "Strategic" | "Private Equity";
 export type DealStatus =
