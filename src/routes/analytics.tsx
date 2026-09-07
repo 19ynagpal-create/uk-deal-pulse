@@ -83,7 +83,10 @@ function AnalyticsPage() {
           {state(sectors) ??
             (sectors.data && (
               <CategoryBars
-                data={[...sectors.data].sort((a, b) => b.medianPremiumPct - a.medianPremiumPct)}
+                data={sectors.data
+                  .filter((s) => s.medianPremiumPct != null)
+                  .map((s) => ({ ...s, medianPremiumPct: s.medianPremiumPct as number }))
+                  .sort((a, b) => b.medianPremiumPct - a.medianPremiumPct)}
                 categoryKey="sector"
                 valueKey="medianPremiumPct"
                 name="Median premium"
