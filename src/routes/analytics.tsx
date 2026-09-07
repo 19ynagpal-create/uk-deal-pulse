@@ -171,6 +171,7 @@ function AnalyticsPage() {
             ))}
         </Panel>
       </div>
+      )}
     </div>
   );
 }
