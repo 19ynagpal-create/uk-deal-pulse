@@ -116,13 +116,13 @@ function AdvisersPage() {
                       <tr className="border-b border-border-strong text-left">
                         <th className="label-caps w-10 py-2.5 pr-3">#</th>
                         <th className="label-caps py-2.5">Adviser</th>
-                        <th className="label-caps py-2.5 text-right whitespace-nowrap">
+                        <th className="label-caps py-2.5 pl-6 text-right whitespace-nowrap">
                           Tracked deals
                         </th>
-                        <th className="label-caps py-2.5 text-right whitespace-nowrap">
+                        <th className="label-caps py-2.5 pl-6 text-right whitespace-nowrap">
                           Total tracked value
                         </th>
-                        <th className="label-caps py-2.5 text-right whitespace-nowrap">
+                        <th className="label-caps py-2.5 pl-6 text-right whitespace-nowrap">
                           Average deal size
                         </th>
                       </tr>
@@ -138,11 +138,11 @@ function AdvisersPage() {
                               {i + 1}
                             </td>
                             <td className="py-3 pr-4 font-medium">{a.adviser}</td>
-                            <td className="num py-3 text-right tabular-nums">{a.deals}</td>
-                            <td className="num py-3 text-right font-medium whitespace-nowrap tabular-nums">
+                            <td className="num py-3 pl-6 text-right tabular-nums">{a.deals}</td>
+                            <td className="num py-3 pl-6 text-right font-medium whitespace-nowrap tabular-nums">
                               {formatValue(a.totalValueGbpM)}
                             </td>
-                            <td className="num py-3 text-right whitespace-nowrap tabular-nums">
+                            <td className="num py-3 pl-6 text-right whitespace-nowrap tabular-nums">
                               {formatValue(a.averageValueGbpM)}
                             </td>
                           </tr>
