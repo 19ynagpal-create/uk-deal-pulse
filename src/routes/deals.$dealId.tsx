@@ -4,6 +4,7 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 
 import {
   dealsRepository,
+  displayName,
   formatDate,
   formatOfferPrice,
   formatPremium,
@@ -79,7 +80,7 @@ function DealDetail() {
               <span className="text-xs text-muted-foreground">{deal.data.sector}</span>
             </div>
             <h1 className="mt-3 text-2xl leading-snug font-semibold sm:text-3xl">
-              {deal.data.target} acquired by {deal.data.acquirer}
+              {displayName(deal.data.target)} acquired by {displayName(deal.data.acquirer)}
             </h1>
           </header>
 
@@ -95,8 +96,8 @@ function DealDetail() {
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Panel title="Transaction overview">
               <dl className="divide-y divide-border text-sm">
-                <Detail label="Target" value={deal.data.target} />
-                <Detail label="Acquirer" value={deal.data.acquirer} />
+                <Detail label="Target" value={displayName(deal.data.target)} />
+                <Detail label="Acquirer" value={displayName(deal.data.acquirer)} />
                 <Detail label="Sector" value={deal.data.sector} />
                 <Detail
                   label="Buyer type"
