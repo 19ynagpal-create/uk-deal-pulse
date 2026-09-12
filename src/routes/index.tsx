@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 import {
   dealsRepository,
+  displayName,
   formatDate,
   formatPremium,
   formatValue,
@@ -22,18 +23,20 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "UK Deal Pulse — Weekly intelligence on UK M&A" },
+      { title: "UK Deal Pulse — UK public M&A intelligence" },
       {
         name: "description",
         content:
-          "Weekly dashboard of major UK public takeovers: transaction values, takeover premiums, sector activity, buyer types and financial advisers.",
+          "Structured intelligence on major UK public takeovers: deal values, premiums, sector activity, buyer types and financial advisers, from primary-source announcements.",
       },
-      { property: "og:title", content: "UK Deal Pulse — Weekly intelligence on UK M&A" },
+      { property: "og:title", content: "UK Deal Pulse — UK public M&A intelligence" },
       {
         property: "og:description",
         content:
-          "Track major UK public takeovers, transaction values, premiums, advisers and sector activity.",
+          "Major UK public takeovers, tracked and structured from primary-source announcements.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,
@@ -68,15 +71,13 @@ function Dashboard() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
       <section className="border-b border-border pb-6">
-        <p className="label-caps">Weekly intelligence on UK M&amp;A</p>
-        <h1 className="mt-2 max-w-3xl text-3xl leading-tight font-semibold sm:text-4xl">
+        <p className="label-caps">
+          UK public M&amp;A intelligence, structured from primary-source announcements
+        </p>
+        <h1 className="mt-2 max-w-3xl text-3xl leading-tight font-semibold sm:text-[2.25rem]">
           Major UK public takeovers, tracked and structured.
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Track major UK public takeovers, transaction values, premiums, advisers and sector
-          activity. Updated weekly from company announcements and other primary sources.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-3">
           <Link
             to="/deals"
             className="inline-flex items-center gap-2 border border-border-strong bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
@@ -90,6 +91,26 @@ function Dashboard() {
             Methodology
           </Link>
         </div>
+        <dl className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <dt className="label-caps">Tracked transactions</dt>
+            <dd className="num font-medium text-foreground">
+              {stats.data ? stats.data.dealCount : "—"}
+            </dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="label-caps">Last updated</dt>
+            <dd className="num font-medium text-foreground">
+              {stats.data?.latestAnnouncement
+                ? formatDate(stats.data.latestAnnouncement)
+                : "—"}
+            </dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="label-caps">Sourcing</dt>
+            <dd className="font-medium text-foreground">Public primary-source announcements</dd>
+          </div>
+        </dl>
       </section>
 
       {isEmpty ? (
@@ -132,7 +153,7 @@ function Dashboard() {
         <Panel
           title="This week in UK M&A"
           note="Rolling seven-day window across tracked transactions"
-          className="lg:col-span-1"
+          className="lg:col-span-1 self-start"
         >
           {week.isPending && <LoadingRows rows={5} />}
           {week.isError && <ErrorState />}
@@ -142,14 +163,14 @@ function Dashboard() {
               <Row label="Total announced value" value={formatValue(week.data.totalValueGbpM)} />
               <Row
                 label="Largest transaction"
-                value={week.data.largest ? week.data.largest.target : "Not disclosed"}
+                value={week.data.largest ? displayName(week.data.largest.target) : "Not disclosed"}
                 sub={week.data.largest ? formatValue(week.data.largest.dealValueGbpM) : undefined}
               />
               <Row label="Median premium" value={formatPremium(week.data.medianPremiumPct)} />
               <Row label="Most active sector" value={week.data.mostActiveSector ?? "—"} />
             </dl>
           )}
-          {week.data && (
+          {week.data && week.data.deals.length > 0 && (
             <div className="mt-4 border-t border-border pt-3">
               <p className="label-caps">Latest transactions</p>
               <ul className="mt-2 divide-y divide-border">
@@ -160,13 +181,13 @@ function Dashboard() {
                       params={{ dealId: d.id }}
                       className="flex items-baseline justify-between gap-3 text-sm hover:underline"
                     >
-                      <span className="font-medium">{d.target}</span>
+                      <span className="font-medium">{displayName(d.target)}</span>
                       <span className="num shrink-0 text-xs text-muted-foreground">
                         {formatDate(d.announcementDate)}
                       </span>
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {d.acquirer} · {formatValue(d.dealValueGbpM)}
+                      {displayName(d.acquirer)} · {formatValue(d.dealValueGbpM)}
                     </p>
                   </li>
                 ))}
@@ -189,7 +210,7 @@ function Dashboard() {
           {recent.isError && <ErrorState />}
           {recent.data &&
             (recent.data.rows.length ? (
-              <DealsTable deals={recent.data.rows} />
+              <DealsTable deals={recent.data.rows} compact />
             ) : (
               <EmptyState message="No transactions recorded yet." />
             ))}

@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 
-import { dealsRepository, formatPremium, formatValue } from "@/data/deals";
+import { dealsRepository, displayName, formatPremium, formatValue } from "@/data/deals";
 import { CategoryBars, MonthlyBars, MonthlyLine } from "@/components/data/charts";
 import {
   ErrorState,
@@ -25,6 +25,8 @@ export const Route = createFileRoute("/analytics")({
         property: "og:description",
         content: "Deal activity, sector mix, premiums and buyer composition across tracked UK takeovers.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AnalyticsPage,
@@ -138,27 +140,27 @@ function AnalyticsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border-strong text-left">
-                      <th className="label-caps py-2">Target</th>
-                      <th className="label-caps py-2">Acquirer</th>
-                      <th className="label-caps py-2">Sector</th>
-                      <th className="label-caps py-2 text-right">Deal value</th>
-                      <th className="label-caps py-2 text-right">Premium</th>
+                      <th className="label-caps py-2.5">Target</th>
+                      <th className="label-caps py-2.5">Acquirer</th>
+                      <th className="label-caps py-2.5">Sector</th>
+                      <th className="label-caps py-2.5 text-right">Deal value</th>
+                      <th className="label-caps py-2.5 text-right">Premium</th>
                     </tr>
                   </thead>
                   <tbody>
                     {largest.data.map((d) => (
                       <tr key={d.id} className="border-b border-border last:border-0">
-                        <td className="py-2.5">
+                        <td className="py-3">
                           <Link
                             to="/deals/$dealId"
                             params={{ dealId: d.id }}
                             className="font-medium underline-offset-4 hover:underline"
                           >
-                            {d.target}
+                            {displayName(d.target)}
                           </Link>
                         </td>
-                        <td className="py-2.5 text-muted-foreground">{d.acquirer}</td>
-                        <td className="py-2.5 text-muted-foreground">{d.sector}</td>
+                        <td className="py-3 text-muted-foreground">{displayName(d.acquirer)}</td>
+                        <td className="py-3 text-muted-foreground">{d.sector}</td>
                         <td className="num py-2.5 text-right font-medium">
                           {formatValue(d.dealValueGbpM)}
                         </td>

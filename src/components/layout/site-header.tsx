@@ -15,24 +15,26 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-[1400px] items-center justify-between gap-6 px-4 sm:px-6">
-        <Link to="/" className="flex items-baseline gap-2">
-          <span className="font-serif text-[1.05rem] font-semibold tracking-tight">
+      <div className="mx-auto flex h-15 max-w-[1400px] items-center justify-between gap-6 px-4 sm:px-6">
+        <Link to="/" className="flex min-w-0 items-baseline gap-2.5">
+          <span className="font-serif text-[1.05rem] font-semibold tracking-tight whitespace-nowrap">
             UK Deal Pulse
           </span>
-          <span className="hidden text-[0.7rem] text-muted-foreground sm:inline">
-            Daily intelligence on UK M&amp;A
+          <span className="hidden truncate border-l border-border pl-2.5 text-[0.7rem] leading-tight text-muted-foreground lg:inline">
+            UK public M&amp;A intelligence, structured from primary-source announcements.
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-0.5 md:flex">
           {nav.map((item) => (
             <Link
               key={item.to}
               to={item.to}
               activeOptions={{ exact: item.to === "/" }}
-              className="rounded-sm px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              activeProps={{ className: "!text-foreground font-semibold" }}
+              className="border-b-2 border-transparent px-3 py-4 text-sm whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground"
+              activeProps={{
+                className: "!border-accent !text-foreground font-semibold",
+              }}
             >
               {item.label}
             </Link>
