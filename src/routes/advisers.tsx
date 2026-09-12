@@ -107,34 +107,68 @@ function AdvisersPage() {
           {advisers.isError && <ErrorState />}
           {advisers.data &&
             (advisers.data.length ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border-strong text-left">
-                      <th className="label-caps py-2 pr-3">#</th>
-                      <th className="label-caps py-2">Adviser</th>
-                      <th className="label-caps py-2 text-right">Tracked deals</th>
-                      <th className="label-caps py-2 text-right">Total tracked value</th>
-                      <th className="label-caps py-2 text-right">Average deal size</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {advisers.data.map((a, i) => (
-                      <tr key={a.adviser} className="border-b border-border last:border-0">
-                        <td className="num py-2.5 pr-3 text-muted-foreground">{i + 1}</td>
-                        <td className="py-2.5 font-medium">{a.adviser}</td>
-                        <td className="num py-2.5 text-right">{a.deals}</td>
-                        <td className="num py-2.5 text-right font-medium">
-                          {formatValue(a.totalValueGbpM)}
-                        </td>
-                        <td className="num py-2.5 text-right">
-                          {formatValue(a.averageValueGbpM)}
-                        </td>
+              <>
+                <div className="-mx-4 overflow-x-auto px-4">
+                  <table className="w-full min-w-[38rem] text-sm">
+                    <thead>
+                      <tr className="border-b border-border-strong text-left">
+                        <th className="label-caps w-10 py-2.5 pr-3">#</th>
+                        <th className="label-caps py-2.5">Adviser</th>
+                        <th className="label-caps py-2.5 text-right whitespace-nowrap">
+                          Tracked deals
+                        </th>
+                        <th className="label-caps py-2.5 text-right whitespace-nowrap">
+                          Total tracked value
+                        </th>
+                        <th className="label-caps py-2.5 text-right whitespace-nowrap">
+                          Average deal size
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {(showAll ? advisers.data : advisers.data.slice(0, DEFAULT_VISIBLE)).map(
+                        (a, i) => (
+                          <tr
+                            key={a.adviser}
+                            className="border-b border-border transition-colors last:border-0 hover:bg-muted/60"
+                          >
+                            <td className="num py-3 pr-3 text-muted-foreground tabular-nums">
+                              {i + 1}
+                            </td>
+                            <td className="py-3 pr-4 font-medium">{a.adviser}</td>
+                            <td className="num py-3 text-right tabular-nums">{a.deals}</td>
+                            <td className="num py-3 text-right font-medium whitespace-nowrap tabular-nums">
+                              {formatValue(a.totalValueGbpM)}
+                            </td>
+                            <td className="num py-3 text-right whitespace-nowrap tabular-nums">
+                              {formatValue(a.averageValueGbpM)}
+                            </td>
+                          </tr>
+                        ),
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {advisers.data.length > DEFAULT_VISIBLE && (
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
+                    <p className="text-xs text-muted-foreground">
+                      Showing{" "}
+                      <span className="num text-foreground">
+                        {showAll ? advisers.data.length : DEFAULT_VISIBLE}
+                      </span>{" "}
+                      of <span className="num text-foreground">{advisers.data.length}</span>{" "}
+                      advisers
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowAll((v) => !v)}
+                      className="border border-border-strong px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted"
+                    >
+                      {showAll ? "Show top 10" : "View all advisers"}
+                    </button>
+                  </div>
+                )}
+              </>
             ) : (
               <EmptyState message="No advisers match these filters." />
             ))}
