@@ -303,6 +303,8 @@ export const dealsRepository = {
 
   async byMonth() {
     const all = await source();
+    if (all.length === 0) return [];
+
     const map = new Map<string, { month: string; deals: number; value: number }>();
     all.forEach((d) => {
       const month = d.announcementDate.slice(0, 7);
@@ -311,7 +313,10 @@ export const dealsRepository = {
       row.value += d.dealValueGbpM ?? 0;
       map.set(month, row);
     });
-    return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
+
+    const months = [...map.keys()].sort();
+    const fullRange = monthRange(months[0]!, months[months.length - 1]!);
+    return fullRange.map((month) => map.get(month) ?? { month, deals: 0, value: 0 });
   },
 
   async bySector() {
