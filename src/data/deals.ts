@@ -215,6 +215,7 @@ export interface HeadlineStats {
   totalValueGbpM: number;
   medianPremiumPct: number | null;
   dealsThisWeek: number;
+  latestAnnouncement: string | null;
 }
 
 export interface WeeklySummary {
@@ -296,6 +297,7 @@ export const dealsRepository = {
         all.map((d) => d.premiumPct).filter((n): n is number => n != null),
       ),
       dealsThisWeek: all.filter((d) => d.announcementDate >= weekStart).length,
+      latestAnnouncement: all[0]?.announcementDate ?? null,
     };
   },
 
@@ -466,6 +468,14 @@ export function formatOfferPrice(
   if (code === "GBX" || code === "PENCE" || code === "P") return `${price.toFixed(0)}p`;
   if (code === "GBP") return `£${price.toFixed(2)}`;
   return `${price.toFixed(2)} ${code}`;
+}
+
+/**
+ * Display-only normalisation of company suffixes (plc / PLC / Plc -> plc).
+ * The underlying database values are never altered.
+ */
+export function displayName(name: string) {
+  return name.replace(/\s+(plc|PLC|Plc)\s*$/i, " plc");
 }
 
 export function formatDate(iso: string) {
