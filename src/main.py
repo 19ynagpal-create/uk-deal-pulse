@@ -3,6 +3,7 @@ import re
 import json
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -10,7 +11,11 @@ from google import genai
 from google.genai import errors
 
 from discovery import discover_candidates
-from rns_discovery import get_daily_takeover_rns
+from rns_discovery import (
+    get_daily_takeover_rns,
+    get_rns_item,
+    fetch_rns_html_text,
+)
 
 
 # =========================================================
@@ -33,13 +38,10 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 
 
 # =========================================================
-# OFFICIAL ANNOUNCEMENT SOURCES
+# HISTORICAL / MANUAL OFFICIAL SOURCES
 #
-# These must be issuer / offeror / official regulatory sources.
-# Never add Investegate URLs here.
-#
-# This list remains for historical / manually verified sources.
-# New daily RNS discovery is handled separately below.
+# New deals should come automatically from RNS.
+# Keep this list only for historical sources already added.
 # =========================================================
 
 OFFICIAL_SOURCES = [
@@ -101,6 +103,7 @@ def processed_source(url):
     )
 
     r.raise_for_status()
+
     rows = r.json()
 
     if not rows:
@@ -110,7 +113,10 @@ def processed_source(url):
 
 
 def save_panel_candidate(target, acquirer):
-    key = panel_candidate_key(target, acquirer)
+    key = panel_candidate_key(
+        target,
+        acquirer,
+    )
 
     if processed_source(key):
         return False
@@ -118,7 +124,8 @@ def save_panel_candidate(target, acquirer):
     payload = {
         "source_url": key,
         "source_title": f"{target} <- {acquirer}",
-        "discovered_at": datetime.now(timezone.utc).isoformat(),
+        "discovered_at":
+            datetime.now(timezone.utc).isoformat(),
         "processed_at": None,
         "processing_status": "discovered_candidate",
         "error_message": None,
@@ -135,6 +142,7 @@ def save_panel_candidate(target, acquirer):
     )
 
     r.raise_for_status()
+
     return True
 
 
@@ -147,8 +155,10 @@ def mark_source(
     payload = {
         "source_url": url,
         "source_title": title,
-        "discovered_at": datetime.now(timezone.utc).isoformat(),
-        "processed_at": datetime.now(timezone.utc).isoformat(),
+        "discovered_at":
+            datetime.now(timezone.utc).isoformat(),
+        "processed_at":
+            datetime.now(timezone.utc).isoformat(),
         "processing_status": status,
         "error_message": error_message,
     }
@@ -173,20 +183,12 @@ def mark_source(
 
 
 # =========================================================
-# SOURCE FETCHING
+# SOURCE TEXT CLEANING
 # =========================================================
 
-def fetch_source_text(url):
-    r = requests.get(
-        url,
-        headers=HTTP_HEADERS,
-        timeout=REQUEST_TIMEOUT,
-    )
-
-    r.raise_for_status()
-
+def clean_html_text(html):
     soup = BeautifulSoup(
-        r.text,
+        html,
         "html.parser",
     )
 
@@ -213,10 +215,24 @@ def fetch_source_text(url):
 
     if len(text) < 300:
         raise ValueError(
-            "Official source returned too little text."
+            "Source returned too little usable text."
         )
 
     return text[:100000]
+
+
+def fetch_source_text(url):
+    r = requests.get(
+        url,
+        headers=HTTP_HEADERS,
+        timeout=REQUEST_TIMEOUT,
+    )
+
+    r.raise_for_status()
+
+    return clean_html_text(
+        r.text
+    )
 
 
 # =========================================================
@@ -232,12 +248,21 @@ LEGAL_WORDS = {
     "company",
     "corp",
     "corporation",
+    "group",
+    "holdings",
 }
 
 
 def name_tokens(value):
-    value = (value or "").lower()
-    value = re.sub(r"[^a-z0-9 ]", " ", value)
+    value = (
+        value or ""
+    ).lower()
+
+    value = re.sub(
+        r"[^a-z0-9 ]",
+        " ",
+        value,
+    )
 
     return {
         token
@@ -247,58 +272,78 @@ def name_tokens(value):
     }
 
 
-def names_compatible(extracted, expected):
-    a = name_tokens(extracted or "")
-    b = name_tokens(expected or "")
+def names_compatible(
+    extracted,
+    expected,
+):
+    a = name_tokens(
+        extracted
+    )
+
+    b = name_tokens(
+        expected
+    )
 
     if not a or not b:
         return False
 
-    overlap = a.intersection(b)
-
-    return bool(overlap)
+    return bool(
+        a.intersection(b)
+    )
 
 
 # =========================================================
-# DAILY RNS / TAKEOVER PANEL MATCHING
+# RNS MATCHING
 # =========================================================
 
 def match_rns_to_panel_candidates(
     rns_items,
     candidates,
 ):
-    """
-    Match likely takeover RNS headlines against the current
-    Takeover Panel offer-situation list.
-
-    This does NOT yet send the RNS into Gemini.
-
-    It safely identifies likely candidate/source pairs first.
-    """
-
     matches = []
 
     for item in rns_items:
         issuer = (
-            (item.get("issuer") or {}).get("name") or ""
+            (item.get("issuer") or {})
+            .get("name")
+            or ""
         )
 
-        headline = item.get("headline") or ""
+        headline = (
+            item.get("headline")
+            or ""
+        )
 
-        issuer_tokens = name_tokens(issuer)
-        headline_tokens = name_tokens(headline)
+        issuer_tokens = name_tokens(
+            issuer
+        )
+
+        headline_tokens = name_tokens(
+            headline
+        )
 
         for candidate in candidates:
             target = (
-                candidate.get("target_name") or ""
+                candidate.get(
+                    "target_name"
+                )
+                or ""
             )
 
             acquirer = (
-                candidate.get("acquirer_name") or ""
+                candidate.get(
+                    "acquirer_name"
+                )
+                or ""
             )
 
-            target_tokens = name_tokens(target)
-            acquirer_tokens = name_tokens(acquirer)
+            target_tokens = name_tokens(
+                target
+            )
+
+            acquirer_tokens = name_tokens(
+                acquirer
+            )
 
             target_match = bool(
                 target_tokens.intersection(
@@ -314,16 +359,50 @@ def match_rns_to_panel_candidates(
                 )
             )
 
-            if target_match or acquirer_match:
+            # Target match is required.
+            # Acquirer match is useful confirmation,
+            # but many RNS headlines omit the buyer.
+            if target_match:
                 matches.append({
                     "rns": item,
                     "target_hint": target,
                     "acquirer_hint": acquirer,
+                    "acquirer_match":
+                        acquirer_match,
                 })
 
                 break
 
     return matches
+
+
+def get_rns_identifier(item):
+    guid = item.get("guid")
+
+    if guid:
+        return guid
+
+    rns_id = item.get("rnsId")
+    timestamp = item.get(
+        "timestamp"
+    )
+
+    if not rns_id or not timestamp:
+        raise ValueError(
+            "Cannot construct RNS identifier."
+        )
+
+    date_string = (
+        timestamp[:10]
+        .replace("-", "")
+    )
+
+    return (
+        "urn:newsml:"
+        "londonstockexchange.com:"
+        f"{date_string}:"
+        f"{rns_id}:1"
+    )
 
 
 # =========================================================
@@ -460,24 +539,33 @@ OFFICIAL SOURCE:
 
     for attempt in range(5):
         try:
-            response = client.models.generate_content(
-                model=GEMINI_MODEL,
-                contents=prompt,
-                config={
-                    "response_mime_type": "application/json"
-                },
+            response = (
+                client.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=prompt,
+                    config={
+                        "response_mime_type":
+                            "application/json"
+                    },
+                )
             )
 
-            return json.loads(response.text)
+            return json.loads(
+                response.text
+            )
 
         except errors.ServerError:
             if attempt == 4:
                 raise
 
-            wait = 10 * (attempt + 1)
+            wait = (
+                10
+                * (attempt + 1)
+            )
 
             print(
-                f"Gemini unavailable. Retrying in {wait}s..."
+                f"Gemini unavailable. "
+                f"Retrying in {wait}s..."
             )
 
             time.sleep(wait)
@@ -496,9 +584,15 @@ def validate(
     target_hint,
     acquirer_hint,
 ):
-    if deal.get("is_relevant_transaction") is not True:
+    if (
+        deal.get(
+            "is_relevant_transaction"
+        )
+        is not True
+    ):
         raise ValueError(
-            "Source is not a confirmed relevant transaction."
+            "Source is not a confirmed "
+            "relevant transaction."
         )
 
     required = [
@@ -511,25 +605,33 @@ def validate(
     for field in required:
         if not deal.get(field):
             raise ValueError(
-                f"Missing required field: {field}"
+                f"Missing required field: "
+                f"{field}"
             )
 
     try:
         datetime.strptime(
-            deal["announcement_date"],
+            deal[
+                "announcement_date"
+            ],
             "%Y-%m-%d",
         )
 
     except ValueError:
         raise ValueError(
-            "announcement_date is not YYYY-MM-DD."
+            "announcement_date is not "
+            "YYYY-MM-DD."
         )
 
     confidence = float(
         deal["confidence"]
     )
 
-    if not 0 <= confidence <= 1:
+    if not (
+        0
+        <= confidence
+        <= 1
+    ):
         raise ValueError(
             "Invalid confidence."
         )
@@ -539,7 +641,8 @@ def validate(
         target_hint,
     ):
         raise ValueError(
-            "Extracted target does not match expected target."
+            "Extracted target does not "
+            "match expected target."
         )
 
     if not names_compatible(
@@ -547,14 +650,15 @@ def validate(
         acquirer_hint,
     ):
         raise ValueError(
-            "Extracted acquirer does not match expected acquirer."
+            "Extracted acquirer does not "
+            "match expected acquirer."
         )
 
     return confidence
 
 
 # =========================================================
-# DEAL DUPLICATION
+# DUPLICATION
 # =========================================================
 
 def duplicate_deal(
@@ -566,7 +670,8 @@ def duplicate_deal(
         headers=db_headers(),
         params={
             "select": "id",
-            "source_url": f"eq.{source_url}",
+            "source_url":
+                f"eq.{source_url}",
             "limit": "1",
         },
         timeout=REQUEST_TIMEOUT,
@@ -583,13 +688,16 @@ def duplicate_deal(
         params={
             "select": "id",
             "target_name": (
-                f"eq.{deal['target_name']}"
+                f"eq."
+                f"{deal['target_name']}"
             ),
             "acquirer_name": (
-                f"eq.{deal['acquirer_name']}"
+                f"eq."
+                f"{deal['acquirer_name']}"
             ),
             "announcement_date": (
-                f"eq.{deal['announcement_date']}"
+                f"eq."
+                f"{deal['announcement_date']}"
             ),
             "limit": "1",
         },
@@ -598,7 +706,9 @@ def duplicate_deal(
 
     r.raise_for_status()
 
-    return bool(r.json())
+    return bool(
+        r.json()
+    )
 
 
 # =========================================================
@@ -610,13 +720,16 @@ def insert_deal(
     source,
     confidence,
 ):
-    uncertain = deal.get(
-        "uncertain_fields"
-    ) or []
+    uncertain = (
+        deal.get(
+            "uncertain_fields"
+        )
+        or []
+    )
 
     core_uncertain = any(
-        x in uncertain
-        for x in [
+        field in uncertain
+        for field in [
             "target_name",
             "acquirer_name",
             "announcement_date",
@@ -630,52 +743,84 @@ def insert_deal(
 
     payload = {
         "target_name":
-            deal.get("target_name"),
+            deal.get(
+                "target_name"
+            ),
 
         "acquirer_name":
-            deal.get("acquirer_name"),
+            deal.get(
+                "acquirer_name"
+            ),
 
         "announcement_date":
-            deal.get("announcement_date"),
+            deal.get(
+                "announcement_date"
+            ),
 
         "deal_value_gbp":
-            deal.get("deal_value_gbp"),
+            deal.get(
+                "deal_value_gbp"
+            ),
 
         "sector":
-            deal.get("sector"),
+            deal.get(
+                "sector"
+            ),
 
         "buyer_type":
-            deal.get("buyer_type"),
+            deal.get(
+                "buyer_type"
+            ),
 
         "acquirer_country":
-            deal.get("acquirer_country"),
+            deal.get(
+                "acquirer_country"
+            ),
 
         "offer_type":
-            deal.get("offer_type"),
+            deal.get(
+                "offer_type"
+            ),
 
         "offer_price":
-            deal.get("offer_price"),
+            deal.get(
+                "offer_price"
+            ),
 
         "offer_price_currency":
-            deal.get("offer_price_currency"),
+            deal.get(
+                "offer_price_currency"
+            ),
 
         "premium_percent":
-            deal.get("premium_percent"),
+            deal.get(
+                "premium_percent"
+            ),
 
         "buyer_advisers":
-            deal.get("buyer_advisers"),
+            deal.get(
+                "buyer_advisers"
+            ),
 
         "target_advisers":
-            deal.get("target_advisers"),
+            deal.get(
+                "target_advisers"
+            ),
 
         "status":
-            deal.get("status"),
+            deal.get(
+                "status"
+            ),
 
         "financing":
-            deal.get("financing"),
+            deal.get(
+                "financing"
+            ),
 
         "strategic_rationale":
-            deal.get("strategic_rationale"),
+            deal.get(
+                "strategic_rationale"
+            ),
 
         "source_url":
             source["url"],
@@ -684,7 +829,9 @@ def insert_deal(
             source["title"],
 
         "source_domain":
-            source["source_domain"],
+            source[
+                "source_domain"
+            ],
 
         "ai_confidence":
             confidence,
@@ -700,7 +847,8 @@ def insert_deal(
         f"{SUPABASE_URL}/rest/v1/deals",
         headers={
             **db_headers(),
-            "Prefer": "return=representation",
+            "Prefer":
+                "return=representation",
         },
         json=payload,
         timeout=REQUEST_TIMEOUT,
@@ -712,22 +860,149 @@ def insert_deal(
 
 
 # =========================================================
+# GENERIC SOURCE PROCESSOR
+# =========================================================
+
+def process_source(
+    source,
+    source_text,
+):
+    existing = processed_source(
+        source["url"]
+    )
+
+    if (
+        existing
+        and existing.get(
+            "processing_status"
+        )
+        != "error"
+    ):
+        print(
+            "Source already processed."
+        )
+
+        return "already_processed"
+
+    deal = extract_deal(
+        source_text,
+        source[
+            "target_hint"
+        ],
+        source[
+            "acquirer_hint"
+        ],
+    )
+
+    print(
+        json.dumps(
+            deal,
+            indent=2,
+        )
+    )
+
+    confidence = validate(
+        deal,
+        source[
+            "target_hint"
+        ],
+        source[
+            "acquirer_hint"
+        ],
+    )
+
+    if duplicate_deal(
+        deal,
+        source["url"],
+    ):
+        print(
+            "Duplicate transaction."
+        )
+
+        mark_source(
+            source["url"],
+            source["title"],
+            "duplicate",
+        )
+
+        return "duplicate"
+
+    if confidence < 0.75:
+        print(
+            "Rejected: "
+            "low confidence."
+        )
+
+        mark_source(
+            source["url"],
+            source["title"],
+            "rejected_low_confidence",
+        )
+
+        return "rejected"
+
+    rows = insert_deal(
+        deal,
+        source,
+        confidence,
+    )
+
+    is_verified = bool(
+        rows
+        and rows[0].get(
+            "verified"
+        )
+    )
+
+    mark_source(
+        source["url"],
+        source["title"],
+        "inserted",
+    )
+
+    if is_verified:
+        print(
+            "INSERT SUCCESS — published"
+        )
+
+        return "published"
+
+    print(
+        "INSERT SUCCESS — "
+        "stored unverified"
+    )
+
+    return "unverified"
+
+
+# =========================================================
 # MAIN
 # =========================================================
 
 def main():
-    print("=" * 70)
-    print("UK DEAL PULSE DAILY UPDATE")
-    print("=" * 70)
-
-    # -----------------------------------------------------
-    # 1. TAKEOVER PANEL DISCOVERY
-    # -----------------------------------------------------
-
-    candidates = discover_candidates()
+    print(
+        "=" * 70
+    )
 
     print(
-        f"Current Takeover Panel candidates: "
+        "UK DEAL PULSE DAILY UPDATE"
+    )
+
+    print(
+        "=" * 70
+    )
+
+    # -----------------------------------------------------
+    # 1. TAKEOVER PANEL
+    # -----------------------------------------------------
+
+    candidates = (
+        discover_candidates()
+    )
+
+    print(
+        f"Current Takeover Panel "
+        f"candidates: "
         f"{len(candidates)}"
     )
 
@@ -735,7 +1010,6 @@ def main():
     known_candidates = 0
 
     for candidate in candidates:
-
         target = candidate.get(
             "target_name"
         )
@@ -754,77 +1028,16 @@ def main():
             new_candidates += 1
 
             print(
-                f"NEW: {target} <- {acquirer}"
+                f"NEW: "
+                f"{target} <- "
+                f"{acquirer}"
             )
 
         else:
             known_candidates += 1
 
     # -----------------------------------------------------
-    # 2. DAILY RNS DISCOVERY
-    # -----------------------------------------------------
-
-    print()
-    print("-" * 70)
-    print("DAILY RNS DISCOVERY")
-    print("-" * 70)
-
-    try:
-        rns_items = get_daily_takeover_rns()
-
-        print(
-            f"Likely takeover RNS announcements: "
-            f"{len(rns_items)}"
-        )
-
-        matched_rns = match_rns_to_panel_candidates(
-            rns_items,
-            candidates,
-        )
-
-        print(
-            f"Matched to Takeover Panel candidates: "
-            f"{len(matched_rns)}"
-        )
-
-        for match in matched_rns:
-            item = match["rns"]
-
-            print()
-            print(
-                "RNS MATCH:",
-                match["target_hint"],
-                "<-",
-                match["acquirer_hint"],
-            )
-
-            print(
-                "RNS ID:",
-                item.get("rnsId"),
-            )
-
-            print(
-                "Headline:",
-                item.get("headline"),
-            )
-
-            print(
-                "Issuer:",
-                (item.get("issuer") or {}).get(
-                    "name"
-                ),
-            )
-
-    except Exception as exc:
-        print(
-            f"RNS DISCOVERY ERROR: {exc}"
-        )
-
-        rns_items = []
-        matched_rns = []
-
-    # -----------------------------------------------------
-    # 3. OFFICIAL SOURCE INGESTION
+    # COUNTERS
     # -----------------------------------------------------
 
     published = 0
@@ -834,131 +1047,263 @@ def main():
     already_processed = 0
     errors_count = 0
 
+    # -----------------------------------------------------
+    # 2. DAILY RNS DISCOVERY
+    # -----------------------------------------------------
+
     print()
     print(
-        f"Official sources configured: "
+        "-" * 70
+    )
+    print(
+        "DAILY RNS DISCOVERY"
+    )
+    print(
+        "-" * 70
+    )
+
+    try:
+        rns_items = (
+            get_daily_takeover_rns()
+        )
+
+        print(
+            f"Likely takeover "
+            f"RNS announcements: "
+            f"{len(rns_items)}"
+        )
+
+        matched_rns = (
+            match_rns_to_panel_candidates(
+                rns_items,
+                candidates,
+            )
+        )
+
+        print(
+            f"Matched to Takeover "
+            f"Panel candidates: "
+            f"{len(matched_rns)}"
+        )
+
+    except Exception as exc:
+        print(
+            f"RNS discovery error: "
+            f"{exc}"
+        )
+
+        rns_items = []
+        matched_rns = []
+
+        errors_count += 1
+
+    # -----------------------------------------------------
+    # 3. PROCESS MATCHED RNS
+    # -----------------------------------------------------
+
+    for match in matched_rns:
+        item = match["rns"]
+
+        target_hint = (
+            match["target_hint"]
+        )
+
+        acquirer_hint = (
+            match["acquirer_hint"]
+        )
+
+        print()
+        print(
+            "-" * 70
+        )
+
+        print(
+            "PROCESSING AUTOMATIC RNS MATCH"
+        )
+
+        print(
+            "-" * 70
+        )
+
+        print(
+            f"{target_hint} <- "
+            f"{acquirer_hint}"
+        )
+
+        try:
+            identifier = (
+                get_rns_identifier(
+                    item
+                )
+            )
+
+            full_item = (
+                get_rns_item(
+                    identifier
+                )
+            )
+
+            if not full_item:
+                raise ValueError(
+                    "Ticker returned "
+                    "no full RNS item."
+                )
+
+            raw_html, html_url = (
+                fetch_rns_html_text(
+                    full_item
+                )
+            )
+
+            source_text = (
+                clean_html_text(
+                    raw_html
+                )
+            )
+
+            headline = (
+                full_item.get(
+                    "headline"
+                )
+                or item.get(
+                    "headline"
+                )
+                or (
+                    f"{target_hint} / "
+                    f"{acquirer_hint}"
+                )
+            )
+
+            source_domain = (
+                urlparse(
+                    html_url
+                ).netloc
+            )
+
+            source = {
+                "title":
+                    headline,
+
+                "url":
+                    html_url,
+
+                "target_hint":
+                    target_hint,
+
+                "acquirer_hint":
+                    acquirer_hint,
+
+                "source_domain":
+                    source_domain,
+            }
+
+            result = process_source(
+                source,
+                source_text,
+            )
+
+            if result == "published":
+                published += 1
+
+            elif result == "unverified":
+                unverified += 1
+
+            elif result == "duplicate":
+                duplicates += 1
+
+            elif result == "rejected":
+                rejected += 1
+
+            elif (
+                result
+                == "already_processed"
+            ):
+                already_processed += 1
+
+        except Exception as exc:
+            errors_count += 1
+
+            print(
+                f"RNS PROCESSING ERROR: "
+                f"{exc}"
+            )
+
+            try:
+                identifier = (
+                    get_rns_identifier(
+                        item
+                    )
+                )
+
+                mark_source(
+                    identifier,
+                    item.get(
+                        "headline"
+                    )
+                    or "RNS",
+                    "error",
+                    str(exc)[:1000],
+                )
+
+            except Exception:
+                pass
+
+    # -----------------------------------------------------
+    # 4. HISTORICAL OFFICIAL SOURCES
+    # -----------------------------------------------------
+
+    print()
+    print(
+        f"Historical official "
+        f"sources configured: "
         f"{len(OFFICIAL_SOURCES)}"
     )
 
     for source in OFFICIAL_SOURCES:
-
         print()
-        print("-" * 70)
         print(
-            f"Processing official source: "
+            "-" * 70
+        )
+
+        print(
+            f"Processing historical "
+            f"source: "
             f"{source['title']}"
         )
-        print("-" * 70)
+
+        print(
+            "-" * 70
+        )
 
         try:
-
-            existing = processed_source(
-                source["url"]
-            )
-
-            if existing and (
-                existing.get(
-                    "processing_status"
-                )
-                != "error"
-            ):
-                print(
-                    "Source already processed."
-                )
-
-                already_processed += 1
-                continue
-
             text = fetch_source_text(
                 source["url"]
             )
 
-            deal = extract_deal(
-                text,
-                source["target_hint"],
-                source["acquirer_hint"],
-            )
-
-            print(
-                json.dumps(
-                    deal,
-                    indent=2,
-                )
-            )
-
-            confidence = validate(
-                deal,
-                source["target_hint"],
-                source["acquirer_hint"],
-            )
-
-            if duplicate_deal(
-                deal,
-                source["url"],
-            ):
-                print(
-                    "Duplicate transaction."
-                )
-
-                mark_source(
-                    source["url"],
-                    source["title"],
-                    "duplicate",
-                )
-
-                duplicates += 1
-                continue
-
-            if confidence < 0.75:
-
-                print(
-                    "Rejected: low confidence."
-                )
-
-                mark_source(
-                    source["url"],
-                    source["title"],
-                    "rejected_low_confidence",
-                )
-
-                rejected += 1
-                continue
-
-            rows = insert_deal(
-                deal,
+            result = process_source(
                 source,
-                confidence,
+                text,
             )
 
-            is_verified = bool(
-                rows
-                and rows[0].get(
-                    "verified"
-                )
-            )
-
-            if is_verified:
+            if result == "published":
                 published += 1
 
-                print(
-                    "INSERT SUCCESS — published"
-                )
-
-            else:
+            elif result == "unverified":
                 unverified += 1
 
-                print(
-                    "INSERT SUCCESS — stored unverified"
-                )
+            elif result == "duplicate":
+                duplicates += 1
 
-            mark_source(
-                source["url"],
-                source["title"],
-                "inserted",
-            )
+            elif result == "rejected":
+                rejected += 1
+
+            elif (
+                result
+                == "already_processed"
+            ):
+                already_processed += 1
 
         except Exception as exc:
-
             errors_count += 1
 
             print(
@@ -981,9 +1326,17 @@ def main():
     # -----------------------------------------------------
 
     print()
-    print("=" * 70)
-    print("UK DEAL PULSE DAILY SUMMARY")
-    print("=" * 70)
+    print(
+        "=" * 70
+    )
+
+    print(
+        "UK DEAL PULSE DAILY SUMMARY"
+    )
+
+    print(
+        "=" * 70
+    )
 
     print(
         f"Current Panel candidates: "
@@ -996,7 +1349,8 @@ def main():
     )
 
     print(
-        f"Already-known Panel candidates: "
+        f"Already-known Panel "
+        f"candidates: "
         f"{known_candidates}"
     )
 
@@ -1006,38 +1360,39 @@ def main():
     )
 
     print(
-        f"RNS matched to Panel candidates: "
+        f"RNS matched to Panel "
+        f"candidates: "
         f"{len(matched_rns)}"
     )
 
     print(
-        f"Official sources checked: "
-        f"{len(OFFICIAL_SOURCES)}"
+        f"Published: "
+        f"{published}"
     )
 
     print(
-        f"Already processed sources: "
+        f"Stored unverified: "
+        f"{unverified}"
+    )
+
+    print(
+        f"Duplicates: "
+        f"{duplicates}"
+    )
+
+    print(
+        f"Rejected: "
+        f"{rejected}"
+    )
+
+    print(
+        f"Already processed: "
         f"{already_processed}"
     )
 
     print(
-        f"Published: {published}"
-    )
-
-    print(
-        f"Stored unverified: {unverified}"
-    )
-
-    print(
-        f"Duplicates: {duplicates}"
-    )
-
-    print(
-        f"Rejected: {rejected}"
-    )
-
-    print(
-        f"Errors: {errors_count}"
+        f"Errors: "
+        f"{errors_count}"
     )
 
 
