@@ -36,9 +36,12 @@ export const Route = createFileRoute("/advisers")({
   component: AdvisersPage,
 });
 
+const DEFAULT_VISIBLE = 10;
+
 function AdvisersPage() {
   const [sector, setSector] = useState("all");
   const [period, setPeriod] = useState("all");
+  const [showAll, setShowAll] = useState(false);
 
   const facets = useQuery({ queryKey: ["facets"], queryFn: () => dealsRepository.facets() });
   const advisers = useQuery({
