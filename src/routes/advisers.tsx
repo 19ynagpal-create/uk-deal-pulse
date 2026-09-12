@@ -60,11 +60,12 @@ function AdvisersPage() {
         description="Financial advisers ranked by their appearances across tracked transactions."
       />
 
-      <div className="mt-5 border border-border-strong border-l-4 border-l-primary bg-surface px-4 py-2.5 text-xs leading-relaxed text-muted-foreground">
-        <span className="font-semibold text-foreground">Dataset scope.</span> This table is based
-        only on transactions within the UK Deal Pulse dataset. It is not an official industry
-        league table and should not be read as one.
-      </div>
+      <p className="mt-4 border-l-2 border-border-strong pl-3 text-[0.7rem] leading-relaxed text-muted-foreground">
+        Dataset scope: based only on transactions within the UK Deal Pulse dataset. Not an official
+        industry league table.
+      </p>
+
+
 
 
       <div className="mt-5 border border-border bg-card">
