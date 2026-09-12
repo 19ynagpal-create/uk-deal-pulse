@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 
 import {
   dealsRepository,
+  displayName,
   formatDate,
   formatPremium,
   formatValue,
