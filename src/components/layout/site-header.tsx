@@ -87,6 +87,9 @@ export function SiteFooter() {
             Methodology and data limitations
           </Link>
         </p>
+        <p className="mt-4 text-[0.7rem] text-muted-foreground/80">
+          UK Deal Pulse was built and is maintained by Yash Nagpal.
+        </p>
       </div>
     </footer>
   );

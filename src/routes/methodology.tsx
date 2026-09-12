@@ -100,6 +100,10 @@ function MethodologyPage() {
           number shown here.
         </p>
       </Section>
+
+      <p className="mt-8 text-[0.7rem] text-muted-foreground/80">
+        UK Deal Pulse was built and is maintained by Yash Nagpal.
+      </p>
     </div>
   );
 }
