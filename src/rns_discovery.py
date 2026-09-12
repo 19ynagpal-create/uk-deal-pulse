@@ -4,6 +4,7 @@ import requests
 from datetime import datetime, timezone
 
 TICKER_API_KEY = os.environ["TICKER_API_KEY"]
+
 BASE_URL = "https://api.tickerapp.net/v2/disclosures/sources/rns/items"
 
 
@@ -42,7 +43,6 @@ def get_page(params, retries=5):
 def is_likely_takeover(item):
     headline = (item.get("headline") or "").lower()
 
-    # Exclude common takeover-related noise
     reject_terms = [
         "form 8.3",
         "form 8.5",
@@ -91,9 +91,13 @@ def get_daily_takeover_rns():
             params["cursor"] = cursor
 
         payload = get_page(params)
+
         items = payload.get("data", [])
 
-        print(f"Scanning {today} page {page}: {len(items)} announcements")
+        print(
+            f"Scanning {today} page {page}: "
+            f"{len(items)} announcements"
+        )
 
         for item in items:
             if is_likely_takeover(item):
@@ -109,6 +113,22 @@ def get_daily_takeover_rns():
         time.sleep(2)
 
     return matches
+
+
+def get_rns_item(rns_identifier):
+    url = f"{BASE_URL}/{rns_identifier}"
+
+    response = requests.get(
+        url,
+        headers=headers(),
+        timeout=30,
+    )
+
+    response.raise_for_status()
+
+    payload = response.json()
+
+    return payload.get("data")
 
 
 if __name__ == "__main__":
