@@ -3,9 +3,15 @@ import time
 import requests
 from datetime import datetime, timezone
 
+
 TICKER_API_KEY = os.environ["TICKER_API_KEY"]
 
-BASE_URL = "https://api.tickerapp.net/v2/disclosures/sources/rns/items"
+BASE_URL = (
+    "https://api.tickerapp.net/"
+    "v2/disclosures/sources/rns/items"
+)
+
+REQUEST_TIMEOUT = 30
 
 
 def headers():
@@ -15,39 +21,70 @@ def headers():
     }
 
 
-def get_page(params, retries=5):
+# =========================================================
+# API REQUEST WITH RATE-LIMIT RETRY
+# =========================================================
+
+def get_page(
+    params,
+    retries=5,
+):
     delay = 3
 
     for _ in range(retries):
+
         response = requests.get(
             BASE_URL,
             headers=headers(),
             params=params,
-            timeout=30,
+            timeout=REQUEST_TIMEOUT,
         )
 
         if response.status_code != 429:
             response.raise_for_status()
             return response.json()
 
-        retry_after = response.headers.get("Retry-After")
-        wait = int(retry_after) if retry_after else delay
+        retry_after = response.headers.get(
+            "Retry-After"
+        )
 
-        print(f"Rate limited — waiting {wait}s")
+        if retry_after:
+            try:
+                wait = int(
+                    retry_after
+                )
+            except ValueError:
+                wait = delay
+        else:
+            wait = delay
+
+        print(
+            f"Ticker rate limited — "
+            f"waiting {wait}s"
+        )
 
         time.sleep(wait)
+
         delay *= 2
 
     raise RuntimeError(
-        "Ticker API rate limit persisted"
+        "Ticker API rate limit persisted "
+        "after retries."
     )
 
 
+# =========================================================
+# TAKEOVER HEADLINE FILTER
+# =========================================================
+
 def is_likely_takeover(item):
+
     headline = (
-        item.get("headline") or ""
+        item.get("headline")
+        or ""
     ).lower()
 
+    # Things we do NOT want to treat as deal announcements.
     reject_terms = [
         "form 8.3",
         "form 8.5",
@@ -56,6 +93,8 @@ def is_likely_takeover(item):
         "holding(s) in company",
         "transaction in own shares",
         "total voting rights",
+        "share buyback",
+        "buyback programme",
     ]
 
     if any(
@@ -67,6 +106,7 @@ def is_likely_takeover(item):
     takeover_terms = [
         "recommended cash acquisition",
         "recommended acquisition",
+        "recommended cash offer",
         "recommended offer",
         "firm intention",
         "rule 2.7",
@@ -84,16 +124,24 @@ def is_likely_takeover(item):
     )
 
 
+# =========================================================
+# TODAY'S RNS FEED
+# =========================================================
+
 def get_daily_takeover_rns():
+
     today = datetime.now(
         timezone.utc
-    ).strftime("%Y-%m-%d")
+    ).strftime(
+        "%Y-%m-%d"
+    )
 
     cursor = None
     page = 1
     matches = []
 
     while True:
+
         params = {
             "pageSize": 100,
             "dateFrom": today,
@@ -103,7 +151,9 @@ def get_daily_takeover_rns():
         if cursor:
             params["cursor"] = cursor
 
-        payload = get_page(params)
+        payload = get_page(
+            params
+        )
 
         items = payload.get(
             "data",
@@ -111,34 +161,58 @@ def get_daily_takeover_rns():
         )
 
         print(
-            f"Scanning {today} page {page}: "
+            f"Scanning {today} "
+            f"page {page}: "
             f"{len(items)} announcements"
         )
 
         for item in items:
-            if is_likely_takeover(item):
-                matches.append(item)
+
+            if is_likely_takeover(
+                item
+            ):
+                matches.append(
+                    item
+                )
 
         paging = (
-            (payload.get("meta") or {})
-            .get("paging")
+            payload.get(
+                "meta"
+            )
             or {}
-        )
+        ).get(
+            "paging"
+        ) or {}
 
-        cursor = paging.get(
+        next_cursor = paging.get(
             "nextCursor"
         )
 
-        if not cursor:
+        if not next_cursor:
             break
 
+        cursor = next_cursor
+
         page += 1
+
         time.sleep(2)
 
     return matches
 
 
-def get_rns_item(rns_identifier):
+# =========================================================
+# GET ONE FULL RNS ITEM
+# =========================================================
+
+def get_rns_item(
+    rns_identifier,
+):
+
+    if not rns_identifier:
+        raise ValueError(
+            "Missing RNS identifier."
+        )
+
     url = (
         f"{BASE_URL}/"
         f"{rns_identifier}"
@@ -147,112 +221,150 @@ def get_rns_item(rns_identifier):
     response = requests.get(
         url,
         headers=headers(),
-        timeout=30,
+        timeout=REQUEST_TIMEOUT,
     )
 
     response.raise_for_status()
 
     payload = response.json()
 
-    return payload.get("data")
+    item = payload.get(
+        "data"
+    )
+
+    if not item:
+        raise ValueError(
+            "Ticker returned no RNS item."
+        )
+
+    return item
 
 
-def get_html_publication_url(item):
+# =========================================================
+# GET HTML PUBLICATION URL
+# =========================================================
+
+def get_html_publication_url(
+    item,
+):
+
     publications = (
-        item.get("publication")
+        item.get(
+            "publication"
+        )
         or []
     )
 
     for publication in publications:
+
         if (
-            publication.get("mime")
+            publication.get(
+                "mime"
+            )
             == "text/html"
         ):
-            return publication.get("url")
+            return publication.get(
+                "url"
+            )
 
     return None
 
 
-def fetch_rns_html_text(item):
-    html_url = get_html_publication_url(
-        item
+# =========================================================
+# FETCH FULL ANNOUNCEMENT HTML
+# =========================================================
+
+def fetch_rns_html_text(
+    item,
+):
+
+    html_url = (
+        get_html_publication_url(
+            item
+        )
     )
 
     if not html_url:
         raise ValueError(
-            "No HTML publication URL found."
+            "RNS item does not contain "
+            "an HTML publication URL."
         )
 
     response = requests.get(
         html_url,
-        timeout=30,
         headers={
             "User-Agent":
                 "UKDealPulse/1.0"
         },
+        timeout=REQUEST_TIMEOUT,
     )
 
     response.raise_for_status()
 
+    html = response.text
+
+    if len(html) < 200:
+        raise ValueError(
+            "RNS HTML publication "
+            "returned too little content."
+        )
+
     return (
-        response.text,
+        html,
         html_url,
     )
 
 
-def expand_rns_item(item):
-    guid = item.get("guid")
-
-    if not guid:
-        raise ValueError(
-            "RNS item has no guid."
-        )
-
-    return get_rns_item(guid)
-
+# =========================================================
+# OPTIONAL LOCAL TEST
+# =========================================================
 
 if __name__ == "__main__":
-    test_identifier = (
-        "urn:newsml:londonstockexchange.com:"
-        "20260911:5136U:1"
-    )
 
-    print("=" * 70)
-    print("TESTING FULL RNS PIPELINE")
-    print("=" * 70)
-
-    full_item = get_rns_item(
-        test_identifier
+    matches = (
+        get_daily_takeover_rns()
     )
 
     print()
-    print("HEADLINE:")
+
     print(
-        full_item.get("headline")
+        "LIKELY TAKEOVER "
+        "ANNOUNCEMENTS:",
+        len(matches),
     )
 
-    print()
-    print("HTML URL:")
-    print(
-        get_html_publication_url(
-            full_item
+    for item in matches:
+
+        print()
+        print(
+            "RNS ID:",
+            item.get(
+                "rnsId"
+            ),
         )
-    )
 
-    html_text, html_url = (
-        fetch_rns_html_text(
-            full_item
+        print(
+            "GUID:",
+            item.get(
+                "guid"
+            ),
         )
-    )
 
-    print()
-    print("HTML FETCH SUCCESS")
+        print(
+            "ISSUER:",
+            (
+                item.get(
+                    "issuer"
+                )
+                or {}
+            ).get(
+                "name"
+            ),
+        )
 
-    print(
-        "Characters:",
-        len(html_text),
-    )
-
-    print()
-    print("Source:")
-    print(html_url)
+        print(
+            "HEADLINE:",
+            item.get(
+                "headline"
+            ),
+        )
