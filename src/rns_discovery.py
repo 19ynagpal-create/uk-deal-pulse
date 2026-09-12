@@ -112,15 +112,35 @@ def get_daily_takeover_rns():
 
 
 if __name__ == "__main__":
-    matches = get_daily_takeover_rns()
+    test_identifier = (
+        "urn:newsml:londonstockexchange.com:"
+        "20260911:5136U:1"
+    )
+
+    print("=" * 70)
+    print("TESTING SINGLE RNS FETCH")
+    print("=" * 70)
 
     print()
-    print(f"LIKELY TAKEOVER ANNOUNCEMENTS: {len(matches)}")
+    print("IDENTIFIER:")
+    print(test_identifier)
+
     print()
 
-    for item in matches:
-        print("RNS ID:", item.get("rnsId"))
-        print("TIME:", item.get("timestamp"))
-        print("ISSUER:", (item.get("issuer") or {}).get("name"))
-        print("HEADLINE:", item.get("headline"))
-        print("-" * 70)
+    try:
+        full_item = get_rns_item(
+            test_identifier
+        )
+
+        print("FULL RNS ITEM:")
+        print(full_item)
+
+        if isinstance(full_item, dict):
+            print()
+            print("AVAILABLE KEYS:")
+            print(list(full_item.keys()))
+
+    except Exception as exc:
+        print()
+        print("ERROR:")
+        print(exc)
