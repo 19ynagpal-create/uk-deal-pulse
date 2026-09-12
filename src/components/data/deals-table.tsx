@@ -6,16 +6,19 @@ import { StatusBadge } from "./primitives";
 export function DealsTable({
   deals,
   showStatus = true,
+  compact = false,
 }: {
   deals: Deal[];
   showStatus?: boolean;
+  compact?: boolean;
 }) {
+  const withStatus = showStatus && !compact;
   return (
     <>
       {/* Desktop table */}
       <div className="-mx-4 hidden overflow-x-auto px-4 md:block">
         <table
-          className={`w-full border-collapse text-sm ${showStatus ? "min-w-[56rem]" : "min-w-[42rem]"}`}
+          className={`w-full border-collapse text-sm ${compact ? "min-w-[40rem]" : withStatus ? "min-w-[56rem]" : "min-w-[46rem]"}`}
         >
           <thead>
             <tr className="border-b border-border-strong text-left">
@@ -24,9 +27,9 @@ export function DealsTable({
               <Th className="min-w-[13.5rem] w-[24%]">Acquirer</Th>
               <Th className="w-[9rem] min-w-[9rem]">Sector</Th>
               <Th className="w-[7.5rem] min-w-[7.5rem] text-right">Deal value</Th>
-              <Th className="w-[7rem] min-w-[7rem] text-right">Premium</Th>
-              <Th className="w-[6.5rem] min-w-[6.5rem]">Buyer type</Th>
-              {showStatus && <Th className="w-[7rem] min-w-[7rem]">Status</Th>}
+              {!compact && <Th className="w-[7rem] min-w-[7rem] text-right">Premium</Th>}
+              {!compact && <Th className="w-[6.5rem] min-w-[6.5rem]">Buyer type</Th>}
+              {withStatus && <Th className="w-[7rem] min-w-[7rem]">Status</Th>}
             </tr>
           </thead>
           <tbody>
@@ -52,13 +55,17 @@ export function DealsTable({
                 <Td className="num whitespace-nowrap text-right font-medium tabular-nums">
                   {formatValue(deal.dealValueGbpM)}
                 </Td>
-                <Td className="num whitespace-nowrap text-right tabular-nums">
-                  {formatPremium(deal.premiumPct)}
-                </Td>
-                <Td className="whitespace-nowrap text-muted-foreground">
-                  {deal.buyerType === "Private Equity" ? "Private equity" : "Strategic"}
-                </Td>
-                {showStatus && (
+                {!compact && (
+                  <Td className="num whitespace-nowrap text-right tabular-nums">
+                    {formatPremium(deal.premiumPct)}
+                  </Td>
+                )}
+                {!compact && (
+                  <Td className="whitespace-nowrap text-muted-foreground">
+                    {deal.buyerType === "Private Equity" ? "Private equity" : "Strategic"}
+                  </Td>
+                )}
+                {withStatus && (
                   <Td>
                     <StatusBadge status={deal.status} />
                   </Td>
@@ -92,7 +99,7 @@ export function DealsTable({
                   Premium {formatPremium(deal.premiumPct)}
                 </span>
                 <span>{deal.buyerType === "Private Equity" ? "Private equity" : "Strategic"}</span>
-                {showStatus && <StatusBadge status={deal.status} />}
+                {withStatus && <StatusBadge status={deal.status} />}
               </div>
             </Link>
           </li>

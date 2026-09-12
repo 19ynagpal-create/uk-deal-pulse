@@ -153,7 +153,7 @@ function Dashboard() {
         <Panel
           title="This week in UK M&A"
           note="Rolling seven-day window across tracked transactions"
-          className="lg:col-span-1"
+          className="lg:col-span-1 self-start"
         >
           {week.isPending && <LoadingRows rows={5} />}
           {week.isError && <ErrorState />}
@@ -210,7 +210,7 @@ function Dashboard() {
           {recent.isError && <ErrorState />}
           {recent.data &&
             (recent.data.rows.length ? (
-              <DealsTable deals={recent.data.rows} />
+              <DealsTable deals={recent.data.rows} compact />
             ) : (
               <EmptyState message="No transactions recorded yet." />
             ))}
