@@ -162,14 +162,14 @@ function Dashboard() {
               <Row label="Total announced value" value={formatValue(week.data.totalValueGbpM)} />
               <Row
                 label="Largest transaction"
-                value={week.data.largest ? week.data.largest.target : "Not disclosed"}
+                value={week.data.largest ? displayName(week.data.largest.target) : "Not disclosed"}
                 sub={week.data.largest ? formatValue(week.data.largest.dealValueGbpM) : undefined}
               />
               <Row label="Median premium" value={formatPremium(week.data.medianPremiumPct)} />
               <Row label="Most active sector" value={week.data.mostActiveSector ?? "—"} />
             </dl>
           )}
-          {week.data && (
+          {week.data && week.data.deals.length > 0 && (
             <div className="mt-4 border-t border-border pt-3">
               <p className="label-caps">Latest transactions</p>
               <ul className="mt-2 divide-y divide-border">
@@ -180,13 +180,13 @@ function Dashboard() {
                       params={{ dealId: d.id }}
                       className="flex items-baseline justify-between gap-3 text-sm hover:underline"
                     >
-                      <span className="font-medium">{d.target}</span>
+                      <span className="font-medium">{displayName(d.target)}</span>
                       <span className="num shrink-0 text-xs text-muted-foreground">
                         {formatDate(d.announcementDate)}
                       </span>
                     </Link>
                     <p className="text-xs text-muted-foreground">
-                      {d.acquirer} · {formatValue(d.dealValueGbpM)}
+                      {displayName(d.acquirer)} · {formatValue(d.dealValueGbpM)}
                     </p>
                   </li>
                 ))}

@@ -14,7 +14,9 @@ export function DealsTable({
     <>
       {/* Desktop table */}
       <div className="-mx-4 hidden overflow-x-auto px-4 md:block">
-        <table className="w-full min-w-[56rem] border-collapse text-sm">
+        <table
+          className={`w-full border-collapse text-sm ${showStatus ? "min-w-[56rem]" : "min-w-[42rem]"}`}
+        >
           <thead>
             <tr className="border-b border-border-strong text-left">
               <Th className="w-[6.5rem] min-w-[6.5rem]">Announced</Th>
