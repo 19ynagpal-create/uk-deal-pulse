@@ -21,7 +21,7 @@ export function SiteHeader() {
             UK Deal Pulse
           </span>
           <span className="hidden text-[0.7rem] text-muted-foreground sm:inline">
-            Weekly intelligence on UK M&amp;A
+            Daily intelligence on UK M&amp;A
           </span>
         </Link>
 
