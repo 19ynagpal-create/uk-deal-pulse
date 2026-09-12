@@ -240,6 +240,27 @@ function daysAgoISO(days: number) {
   return d.toISOString().slice(0, 10);
 }
 
+function monthRange(startMonth: string, endMonth: string): string[] {
+  const parseMonth = (month: string) => {
+    const [y, m] = month.split("-");
+    return { y: Number(y), m: Number(m) };
+  };
+  const start = parseMonth(startMonth);
+  const end = parseMonth(endMonth);
+  const months: string[] = [];
+  let y = start.y;
+  let m = start.m;
+  while (y < end.y || (y === end.y && m <= end.m)) {
+    months.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return months;
+}
+
 export const dealsRepository = {
   async list(query: DealQuery = {}): Promise<DealPage> {
     const all = await source();
@@ -303,6 +324,8 @@ export const dealsRepository = {
 
   async byMonth() {
     const all = await source();
+    if (all.length === 0) return [];
+
     const map = new Map<string, { month: string; deals: number; value: number }>();
     all.forEach((d) => {
       const month = d.announcementDate.slice(0, 7);
@@ -311,7 +334,10 @@ export const dealsRepository = {
       row.value += d.dealValueGbpM ?? 0;
       map.set(month, row);
     });
-    return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
+
+    const months = [...map.keys()].sort();
+    const fullRange = monthRange(months[0]!, months[months.length - 1]!);
+    return fullRange.map((month) => map.get(month) ?? { month, deals: 0, value: 0 });
   },
 
   async bySector() {

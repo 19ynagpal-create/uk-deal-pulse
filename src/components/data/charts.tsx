@@ -68,7 +68,13 @@ export function MonthlyBars({
     <ChartFrame>
       <BarChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke="var(--color-border)" />
-        <XAxis dataKey="month" tickFormatter={monthLabel} {...axis} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          interval="preserveStartEnd"
+          minTickGap={24}
+          {...axis}
+        />
         <YAxis
           {...axis}
           width={56}
@@ -97,7 +103,13 @@ export function MonthlyLine({
     <ChartFrame>
       <LineChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 0 }}>
         <CartesianGrid vertical={false} stroke="var(--color-border)" />
-        <XAxis dataKey="month" tickFormatter={monthLabel} {...axis} />
+        <XAxis
+          dataKey="month"
+          tickFormatter={monthLabel}
+          interval="preserveStartEnd"
+          minTickGap={24}
+          {...axis}
+        />
         <YAxis {...axis} width={56} tickFormatter={(v) => (formatter ? formatter(v) : String(v))} />
         <Tooltip
           {...tooltipStyle}
