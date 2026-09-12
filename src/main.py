@@ -10,6 +10,7 @@ from google import genai
 from google.genai import errors
 
 from discovery import discover_candidates
+from rns_discovery import get_daily_takeover_rns
 
 
 # =========================================================
@@ -36,6 +37,9 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 #
 # These must be issuer / offeror / official regulatory sources.
 # Never add Investegate URLs here.
+#
+# This list remains for historical / manually verified sources.
+# New daily RNS discovery is handled separately below.
 # =========================================================
 
 OFFICIAL_SOURCES = [
@@ -212,8 +216,6 @@ def fetch_source_text(url):
             "Official source returned too little text."
         )
 
-    # Enough for an offer announcement while avoiding
-    # sending enormous pages to Gemini.
     return text[:100000]
 
 
@@ -234,7 +236,7 @@ LEGAL_WORDS = {
 
 
 def name_tokens(value):
-    value = value.lower()
+    value = (value or "").lower()
     value = re.sub(r"[^a-z0-9 ]", " ", value)
 
     return {
@@ -255,6 +257,73 @@ def names_compatible(extracted, expected):
     overlap = a.intersection(b)
 
     return bool(overlap)
+
+
+# =========================================================
+# DAILY RNS / TAKEOVER PANEL MATCHING
+# =========================================================
+
+def match_rns_to_panel_candidates(
+    rns_items,
+    candidates,
+):
+    """
+    Match likely takeover RNS headlines against the current
+    Takeover Panel offer-situation list.
+
+    This does NOT yet send the RNS into Gemini.
+
+    It safely identifies likely candidate/source pairs first.
+    """
+
+    matches = []
+
+    for item in rns_items:
+        issuer = (
+            (item.get("issuer") or {}).get("name") or ""
+        )
+
+        headline = item.get("headline") or ""
+
+        issuer_tokens = name_tokens(issuer)
+        headline_tokens = name_tokens(headline)
+
+        for candidate in candidates:
+            target = (
+                candidate.get("target_name") or ""
+            )
+
+            acquirer = (
+                candidate.get("acquirer_name") or ""
+            )
+
+            target_tokens = name_tokens(target)
+            acquirer_tokens = name_tokens(acquirer)
+
+            target_match = bool(
+                target_tokens.intersection(
+                    issuer_tokens.union(
+                        headline_tokens
+                    )
+                )
+            )
+
+            acquirer_match = bool(
+                acquirer_tokens.intersection(
+                    headline_tokens
+                )
+            )
+
+            if target_match or acquirer_match:
+                matches.append({
+                    "rns": item,
+                    "target_hint": target,
+                    "acquirer_hint": acquirer,
+                })
+
+                break
+
+    return matches
 
 
 # =========================================================
@@ -450,6 +519,7 @@ def validate(
             deal["announcement_date"],
             "%Y-%m-%d",
         )
+
     except ValueError:
         raise ValueError(
             "announcement_date is not YYYY-MM-DD."
@@ -647,7 +717,7 @@ def insert_deal(
 
 def main():
     print("=" * 70)
-    print("UK DEAL PULSE WEEKLY UPDATE")
+    print("UK DEAL PULSE DAILY UPDATE")
     print("=" * 70)
 
     # -----------------------------------------------------
@@ -686,11 +756,75 @@ def main():
             print(
                 f"NEW: {target} <- {acquirer}"
             )
+
         else:
             known_candidates += 1
 
     # -----------------------------------------------------
-    # 2. OFFICIAL SOURCE INGESTION
+    # 2. DAILY RNS DISCOVERY
+    # -----------------------------------------------------
+
+    print()
+    print("-" * 70)
+    print("DAILY RNS DISCOVERY")
+    print("-" * 70)
+
+    try:
+        rns_items = get_daily_takeover_rns()
+
+        print(
+            f"Likely takeover RNS announcements: "
+            f"{len(rns_items)}"
+        )
+
+        matched_rns = match_rns_to_panel_candidates(
+            rns_items,
+            candidates,
+        )
+
+        print(
+            f"Matched to Takeover Panel candidates: "
+            f"{len(matched_rns)}"
+        )
+
+        for match in matched_rns:
+            item = match["rns"]
+
+            print()
+            print(
+                "RNS MATCH:",
+                match["target_hint"],
+                "<-",
+                match["acquirer_hint"],
+            )
+
+            print(
+                "RNS ID:",
+                item.get("rnsId"),
+            )
+
+            print(
+                "Headline:",
+                item.get("headline"),
+            )
+
+            print(
+                "Issuer:",
+                (item.get("issuer") or {}).get(
+                    "name"
+                ),
+            )
+
+    except Exception as exc:
+        print(
+            f"RNS DISCOVERY ERROR: {exc}"
+        )
+
+        rns_items = []
+        matched_rns = []
+
+    # -----------------------------------------------------
+    # 3. OFFICIAL SOURCE INGESTION
     # -----------------------------------------------------
 
     published = 0
@@ -805,11 +939,14 @@ def main():
 
             if is_verified:
                 published += 1
+
                 print(
                     "INSERT SUCCESS — published"
                 )
+
             else:
                 unverified += 1
+
                 print(
                     "INSERT SUCCESS — stored unverified"
                 )
@@ -835,12 +972,17 @@ def main():
                     "error",
                     str(exc)[:1000],
                 )
+
             except Exception:
                 pass
 
+    # -----------------------------------------------------
+    # SUMMARY
+    # -----------------------------------------------------
+
     print()
     print("=" * 70)
-    print("UK DEAL PULSE WEEKLY SUMMARY")
+    print("UK DEAL PULSE DAILY SUMMARY")
     print("=" * 70)
 
     print(
@@ -856,6 +998,16 @@ def main():
     print(
         f"Already-known Panel candidates: "
         f"{known_candidates}"
+    )
+
+    print(
+        f"Likely takeover RNS today: "
+        f"{len(rns_items)}"
+    )
+
+    print(
+        f"RNS matched to Panel candidates: "
+        f"{len(matched_rns)}"
     )
 
     print(
