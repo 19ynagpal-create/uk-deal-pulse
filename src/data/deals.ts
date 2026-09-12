@@ -301,23 +301,6 @@ export const dealsRepository = {
     };
   },
 
-function monthRange(startMonth: string, endMonth: string): string[] {
-  const [startY, startM] = startMonth.split("-").map(Number);
-  const [endY, endM] = endMonth.split("-").map(Number);
-  const months: string[] = [];
-  let y = startY;
-  let m = startM;
-  while (y < endY || (y === endY && m <= endM)) {
-    months.push(`${y}-${String(m).padStart(2, "0")}`);
-    m++;
-    if (m > 12) {
-      m = 1;
-      y++;
-    }
-  }
-  return months;
-}
-
   async byMonth() {
     const all = await source();
     if (all.length === 0) return [];
