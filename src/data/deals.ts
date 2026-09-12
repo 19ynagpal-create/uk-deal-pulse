@@ -240,6 +240,23 @@ function daysAgoISO(days: number) {
   return d.toISOString().slice(0, 10);
 }
 
+function monthRange(startMonth: string, endMonth: string): string[] {
+  const [startY, startM] = startMonth.split("-").map(Number);
+  const [endY, endM] = endMonth.split("-").map(Number);
+  const months: string[] = [];
+  let y = startY;
+  let m = startM;
+  while (y < endY || (y === endY && m <= endM)) {
+    months.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) {
+      m = 1;
+      y++;
+    }
+  }
+  return months;
+}
+
 export const dealsRepository = {
   async list(query: DealQuery = {}): Promise<DealPage> {
     const all = await source();
