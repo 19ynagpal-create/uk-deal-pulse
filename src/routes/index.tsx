@@ -22,18 +22,20 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "UK Deal Pulse — Weekly intelligence on UK M&A" },
+      { title: "UK Deal Pulse — UK public M&A intelligence" },
       {
         name: "description",
         content:
-          "Weekly dashboard of major UK public takeovers: transaction values, takeover premiums, sector activity, buyer types and financial advisers.",
+          "Structured intelligence on major UK public takeovers: deal values, premiums, sector activity, buyer types and financial advisers, from primary-source announcements.",
       },
-      { property: "og:title", content: "UK Deal Pulse — Weekly intelligence on UK M&A" },
+      { property: "og:title", content: "UK Deal Pulse — UK public M&A intelligence" },
       {
         property: "og:description",
         content:
-          "Track major UK public takeovers, transaction values, premiums, advisers and sector activity.",
+          "Major UK public takeovers, tracked and structured from primary-source announcements.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: Dashboard,
