@@ -241,12 +241,16 @@ function daysAgoISO(days: number) {
 }
 
 function monthRange(startMonth: string, endMonth: string): string[] {
-  const [startY, startM] = startMonth.split("-").map(Number);
-  const [endY, endM] = endMonth.split("-").map(Number);
+  const parseMonth = (month: string) => {
+    const [y, m] = month.split("-");
+    return { y: Number(y), m: Number(m) };
+  };
+  const start = parseMonth(startMonth);
+  const end = parseMonth(endMonth);
   const months: string[] = [];
-  let y = startY;
-  let m = startM;
-  while (y < endY || (y === endY && m <= endM)) {
+  let y = start.y;
+  let m = start.m;
+  while (y < end.y || (y === end.y && m <= end.m)) {
     months.push(`${y}-${String(m).padStart(2, "0")}`);
     m++;
     if (m > 12) {
