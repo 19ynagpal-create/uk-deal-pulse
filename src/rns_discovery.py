@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from datetime import datetime, timedelta, timezone
 
@@ -26,24 +27,31 @@ def _score_item(item, target_name, acquirer_name=None):
 
     score = 0
 
-    # Target company publishing the RNS is a very strong signal
+    # Target company publishing the RNS
     if target and target in issuer:
         score += 10
 
-    offer_terms = [
+    strong_offer_terms = [
         "recommended cash acquisition",
         "recommended acquisition",
         "firm intention",
         "rule 2.7",
         "recommended offer",
         "scheme of arrangement",
+    ]
+
+    weak_offer_terms = [
         "acquisition of",
         "offer for",
     ]
 
-    for term in offer_terms:
+    for term in strong_offer_terms:
         if term in headline:
-            score += 5
+            score += 8
+
+    for term in weak_offer_terms:
+        if term in headline:
+            score += 3
 
     if target and target in headline:
         score += 4
@@ -51,7 +59,50 @@ def _score_item(item, target_name, acquirer_name=None):
     if acquirer and acquirer in headline:
         score += 3
 
+    # Penalise irrelevant disclosure forms
+    bad_terms = [
+        "form 8.3",
+        "form 8.5",
+        "dealing disclosure",
+        "holding(s) in company",
+        "transaction in own shares",
+    ]
+
+    for term in bad_terms:
+        if term in headline:
+            score -= 15
+
     return score
+
+
+def _get_with_retry(params, max_retries=5):
+    delay = 3
+
+    for attempt in range(max_retries):
+        response = requests.get(
+            BASE_URL,
+            headers=_headers(),
+            params=params,
+            timeout=30,
+        )
+
+        if response.status_code != 429:
+            response.raise_for_status()
+            return response
+
+        retry_after = response.headers.get("Retry-After")
+
+        if retry_after:
+            wait = int(retry_after)
+        else:
+            wait = delay
+
+        print(f"Rate limited. Waiting {wait}s before retry...")
+        time.sleep(wait)
+
+        delay *= 2
+
+    raise RuntimeError("Ticker API rate limit persisted after retries")
 
 
 def discover_rns_for_candidate(
@@ -61,11 +112,6 @@ def discover_rns_for_candidate(
     page_size=100,
     max_pages=20,
 ):
-    """
-    Search backwards through RNS announcements for the most likely
-    takeover announcement relating to a Takeover Panel candidate.
-    """
-
     cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
 
     cursor = None
@@ -73,35 +119,20 @@ def discover_rns_for_candidate(
     best_score = 0
 
     for page_number in range(1, max_pages + 1):
-
-        params = {
-            "pageSize": page_size,
-        }
+        params = {"pageSize": page_size}
 
         if cursor:
             params["cursor"] = cursor
 
-        response = requests.get(
-            BASE_URL,
-            headers=_headers(),
-            params=params,
-            timeout=30,
-        )
-
-        response.raise_for_status()
-
+        response = _get_with_retry(params)
         payload = response.json()
+
         items = payload.get("data", [])
 
         if not items:
             break
 
-        print(
-            f"Scanning RNS page {page_number}: "
-            f"{len(items)} announcements"
-        )
-
-        oldest_timestamp = None
+        print(f"Scanning RNS page {page_number}: {len(items)} announcements")
 
         for item in items:
             timestamp = item.get("timestamp")
@@ -111,8 +142,6 @@ def discover_rns_for_candidate(
                     item_date = datetime.fromisoformat(
                         timestamp.replace("Z", "+00:00")
                     )
-
-                    oldest_timestamp = item_date
 
                     if item_date < cutoff:
                         print("Reached lookback limit")
@@ -147,7 +176,9 @@ def discover_rns_for_candidate(
 
         cursor = next_cursor
 
-    # Require a reasonably strong match
+        # Avoid hammering the API
+        time.sleep(2)
+
     if best_score < 10:
         return None
 
@@ -155,7 +186,6 @@ def discover_rns_for_candidate(
 
 
 if __name__ == "__main__":
-
     result = discover_rns_for_candidate(
         target_name="SEGRO plc",
         acquirer_name="Prologis",
@@ -170,6 +200,5 @@ if __name__ == "__main__":
         print("DATE:", result.get("timestamp"))
         print("ISSUER:", (result.get("issuer") or {}).get("name"))
         print("HEADLINE:", result.get("headline"))
-        print(result)
     else:
         print("NO MATCH")
