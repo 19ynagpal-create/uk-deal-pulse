@@ -3,6 +3,10 @@ import type { Deal } from "@/data/deals";
 import { formatDate, formatPremium, formatValue } from "@/data/deals";
 import { StatusBadge } from "./primitives";
 
+function standardiseName(name: string) {
+  return name.replace(/\s+(plc|PLC|Plc)\s*$/i, " plc");
+}
+
 export function DealsTable({
   deals,
   showStatus = true,
@@ -17,14 +21,14 @@ export function DealsTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border-strong text-left">
-              <Th>Announced</Th>
-              <Th>Target</Th>
-              <Th>Acquirer</Th>
-              <Th>Sector</Th>
-              <Th className="text-right">Deal value</Th>
-              <Th className="text-right">Premium</Th>
-              <Th>Buyer type</Th>
-              {showStatus && <Th>Status</Th>}
+              <Th className="w-[7.5rem] min-w-[7.5rem]">Announced</Th>
+              <Th className="min-w-[11rem] w-[22%]">Target</Th>
+              <Th className="min-w-[11rem] w-[22%]">Acquirer</Th>
+              <Th className="w-[10rem] min-w-[10rem]">Sector</Th>
+              <Th className="w-[7.5rem] min-w-[7.5rem] text-right">Deal value</Th>
+              <Th className="w-[6.5rem] min-w-[6.5rem] text-right">Premium</Th>
+              <Th className="w-[7rem] min-w-[7rem]">Buyer type</Th>
+              {showStatus && <Th className="w-[7.5rem] min-w-[7.5rem]">Status</Th>}
             </tr>
           </thead>
           <tbody>
@@ -42,13 +46,17 @@ export function DealsTable({
                     params={{ dealId: deal.id }}
                     className="font-medium underline-offset-4 hover:underline"
                   >
-                    {deal.target}
+                    {standardiseName(deal.target)}
                   </Link>
                 </Td>
-                <Td className="text-muted-foreground">{deal.acquirer}</Td>
+                <Td className="text-muted-foreground">{standardiseName(deal.acquirer)}</Td>
                 <Td className="text-muted-foreground">{deal.sector}</Td>
-                <Td className="num text-right font-medium">{formatValue(deal.dealValueGbpM)}</Td>
-                <Td className="num text-right">{formatPremium(deal.premiumPct)}</Td>
+                <Td className="num whitespace-nowrap text-right font-medium">
+                  {formatValue(deal.dealValueGbpM)}
+                </Td>
+                <Td className="num whitespace-nowrap text-right">
+                  {formatPremium(deal.premiumPct)}
+                </Td>
                 <Td className="text-muted-foreground">
                   {deal.buyerType === "Private Equity" ? "Private equity" : "Strategic"}
                 </Td>
@@ -69,18 +77,20 @@ export function DealsTable({
           <li key={deal.id} className="py-3">
             <Link to="/deals/$dealId" params={{ dealId: deal.id }} className="block">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium">{deal.target}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Acquirer: {deal.acquirer}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{standardiseName(deal.target)}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    Acquirer: {standardiseName(deal.acquirer)}
                   </p>
                 </div>
-                <span className="num text-sm font-semibold">{formatValue(deal.dealValueGbpM)}</span>
+                <span className="num shrink-0 whitespace-nowrap text-sm font-semibold">
+                  {formatValue(deal.dealValueGbpM)}
+                </span>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="num">{formatDate(deal.announcementDate)}</span>
+                <span className="num whitespace-nowrap">{formatDate(deal.announcementDate)}</span>
                 <span>{deal.sector}</span>
-                <span className="num">Premium {formatPremium(deal.premiumPct)}</span>
+                <span className="num whitespace-nowrap">Premium {formatPremium(deal.premiumPct)}</span>
                 <span>{deal.buyerType === "Private Equity" ? "Private equity" : "Strategic"}</span>
                 {showStatus && <StatusBadge status={deal.status} />}
               </div>
