@@ -68,15 +68,13 @@ function Dashboard() {
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:px-6">
       <section className="border-b border-border pb-6">
-        <p className="label-caps">Weekly intelligence on UK M&amp;A</p>
-        <h1 className="mt-2 max-w-3xl text-3xl leading-tight font-semibold sm:text-4xl">
+        <p className="label-caps">
+          UK public M&amp;A intelligence, structured from primary-source announcements
+        </p>
+        <h1 className="mt-2 max-w-3xl text-3xl leading-tight font-semibold sm:text-[2.25rem]">
           Major UK public takeovers, tracked and structured.
         </h1>
-        <p className="mt-3 max-w-3xl text-sm leading-relaxed text-muted-foreground">
-          Track major UK public takeovers, transaction values, premiums, advisers and sector
-          activity. Updated weekly from company announcements and other primary sources.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-3">
           <Link
             to="/deals"
             className="inline-flex items-center gap-2 border border-border-strong bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
@@ -90,6 +88,26 @@ function Dashboard() {
             Methodology
           </Link>
         </div>
+        <dl className="mt-5 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <dt className="label-caps">Tracked transactions</dt>
+            <dd className="num font-medium text-foreground">
+              {stats.data ? stats.data.dealCount : "—"}
+            </dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="label-caps">Last updated</dt>
+            <dd className="num font-medium text-foreground">
+              {stats.data?.latestAnnouncement
+                ? formatDate(stats.data.latestAnnouncement)
+                : "—"}
+            </dd>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <dt className="label-caps">Sourcing</dt>
+            <dd className="font-medium text-foreground">Public primary-source announcements</dd>
+          </div>
+        </dl>
       </section>
 
       {isEmpty ? (
