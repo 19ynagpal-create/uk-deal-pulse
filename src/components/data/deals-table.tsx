@@ -21,14 +21,14 @@ export function DealsTable({
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-border-strong text-left">
-              <Th className="w-[7.5rem] min-w-[7.5rem]">Announced</Th>
-              <Th className="min-w-[11rem] w-[22%]">Target</Th>
-              <Th className="min-w-[11rem] w-[22%]">Acquirer</Th>
-              <Th className="w-[10rem] min-w-[10rem]">Sector</Th>
-              <Th className="w-[7.5rem] min-w-[7.5rem] text-right">Deal value</Th>
-              <Th className="w-[6.5rem] min-w-[6.5rem] text-right">Premium</Th>
-              <Th className="w-[7rem] min-w-[7rem]">Buyer type</Th>
-              {showStatus && <Th className="w-[7.5rem] min-w-[7.5rem]">Status</Th>}
+              <Th className="w-[6.5rem] min-w-[6.5rem]">Announced</Th>
+              <Th className="min-w-[12rem] w-[23%]">Target</Th>
+              <Th className="min-w-[12rem] w-[23%]">Acquirer</Th>
+              <Th className="w-[8.5rem] min-w-[8.5rem]">Sector</Th>
+              <Th className="w-[7rem] min-w-[7rem] text-right">Deal value</Th>
+              <Th className="w-[6rem] min-w-[6rem] text-right">Premium</Th>
+              <Th className="w-[6rem] min-w-[6rem]">Buyer type</Th>
+              {showStatus && <Th className="w-[6.5rem] min-w-[6.5rem]">Status</Th>}
             </tr>
           </thead>
           <tbody>
