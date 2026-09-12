@@ -23,9 +23,15 @@ export function DealsTable({
           <thead>
             <tr className="border-b border-border-strong text-left">
               <Th className="w-[6.5rem] min-w-[6.5rem]">Announced</Th>
-              <Th className="min-w-[13.5rem] w-[24%]">Target</Th>
-              <Th className="min-w-[13.5rem] w-[24%]">Acquirer</Th>
-              <Th className="w-[9rem] min-w-[9rem]">Sector</Th>
+              <Th className={`w-[24%] ${compact ? "min-w-[10.5rem]" : "min-w-[13.5rem]"}`}>
+                Target
+              </Th>
+              <Th className={`w-[24%] ${compact ? "min-w-[10.5rem]" : "min-w-[13.5rem]"}`}>
+                Acquirer
+              </Th>
+              <Th className={compact ? "w-[7.5rem] min-w-[7.5rem]" : "w-[9rem] min-w-[9rem]"}>
+                Sector
+              </Th>
               <Th className="w-[7.5rem] min-w-[7.5rem] text-right">Deal value</Th>
               {!compact && <Th className="w-[7rem] min-w-[7rem] text-right">Premium</Th>}
               {!compact && <Th className="w-[6.5rem] min-w-[6.5rem]">Buyer type</Th>}
