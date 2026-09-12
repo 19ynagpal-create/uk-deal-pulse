@@ -1,164 +1,139 @@
 import os
 import time
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 TICKER_API_KEY = os.environ["TICKER_API_KEY"]
+
 BASE_URL = "https://api.tickerapp.net/v2/disclosures/sources/rns/items"
 
 
-def _headers():
+def headers():
     return {
         "x-api-key": TICKER_API_KEY,
         "accept": "application/json",
     }
 
 
-def _normalise(value):
+def normalise(value):
     return (value or "").lower().strip()
 
 
-def _score_item(item, target_name, acquirer_name=None):
-    issuer = _normalise((item.get("issuer") or {}).get("name"))
-    headline = _normalise(item.get("headline"))
+def score_item(item, target_name, acquirer_name=None):
+    issuer = normalise((item.get("issuer") or {}).get("name"))
+    headline = normalise(item.get("headline"))
 
-    target = _normalise(target_name)
-    acquirer = _normalise(acquirer_name)
+    target = normalise(target_name)
+    acquirer = normalise(acquirer_name)
 
     score = 0
 
-    # Target company publishing the RNS
+    # Strongest signal
     if target and target in issuer:
-        score += 10
+        score += 12
 
-    strong_offer_terms = [
+    if target and target in headline:
+        score += 5
+
+    if acquirer and acquirer in headline:
+        score += 4
+
+    takeover_terms = [
         "recommended cash acquisition",
         "recommended acquisition",
+        "recommended offer",
         "firm intention",
         "rule 2.7",
-        "recommended offer",
         "scheme of arrangement",
-    ]
-
-    weak_offer_terms = [
         "acquisition of",
         "offer for",
     ]
 
-    for term in strong_offer_terms:
+    for term in takeover_terms:
         if term in headline:
-            score += 8
+            score += 6
 
-    for term in weak_offer_terms:
-        if term in headline:
-            score += 3
-
-    if target and target in headline:
-        score += 4
-
-    if acquirer and acquirer in headline:
-        score += 3
-
-    # Penalise irrelevant disclosure forms
+    # Reject common irrelevant takeover disclosures
     bad_terms = [
         "form 8.3",
         "form 8.5",
         "dealing disclosure",
         "holding(s) in company",
         "transaction in own shares",
+        "opening position disclosure",
     ]
 
     for term in bad_terms:
         if term in headline:
-            score -= 15
+            score -= 20
 
     return score
 
 
-def _get_with_retry(params, max_retries=5):
+def get_page(params, retries=5):
     delay = 3
 
-    for attempt in range(max_retries):
+    for _ in range(retries):
         response = requests.get(
             BASE_URL,
-            headers=_headers(),
+            headers=headers(),
             params=params,
             timeout=30,
         )
 
         if response.status_code != 429:
             response.raise_for_status()
-            return response
+            return response.json()
 
         retry_after = response.headers.get("Retry-After")
 
-        if retry_after:
-            wait = int(retry_after)
-        else:
-            wait = delay
+        wait = int(retry_after) if retry_after else delay
 
-        print(f"Rate limited. Waiting {wait}s before retry...")
+        print(f"Rate limited — waiting {wait}s")
         time.sleep(wait)
 
         delay *= 2
 
-    raise RuntimeError("Ticker API rate limit persisted after retries")
+    raise RuntimeError("Ticker API rate limit persisted")
 
 
-def discover_rns_for_candidate(
-    target_name,
-    acquirer_name=None,
-    lookback_days=90,
-    page_size=100,
-    max_pages=20,
-):
-    cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
+def search_day(target_name, acquirer_name, search_date):
+    date_string = search_date.strftime("%Y-%m-%d")
 
     cursor = None
-    best_match = None
+    best_item = None
     best_score = 0
+    page = 1
 
-    for page_number in range(1, max_pages + 1):
-        params = {"pageSize": page_size}
+    while True:
+        params = {
+            "pageSize": 100,
+            "dateFrom": date_string,
+            "dateTo": date_string,
+        }
 
         if cursor:
             params["cursor"] = cursor
 
-        response = _get_with_retry(params)
-        payload = response.json()
+        payload = get_page(params)
 
         items = payload.get("data", [])
 
-        if not items:
-            break
-
-        print(f"Scanning RNS page {page_number}: {len(items)} announcements")
+        print(
+            f"{date_string} — page {page}: "
+            f"{len(items)} announcements"
+        )
 
         for item in items:
-            timestamp = item.get("timestamp")
-
-            if timestamp:
-                try:
-                    item_date = datetime.fromisoformat(
-                        timestamp.replace("Z", "+00:00")
-                    )
-
-                    if item_date < cutoff:
-                        print("Reached lookback limit")
-                        return best_match
-
-                except ValueError:
-                    pass
-
-            score = _score_item(
+            score = score_item(
                 item,
-                target_name=target_name,
-                acquirer_name=acquirer_name,
+                target_name,
+                acquirer_name,
             )
 
             if score > best_score:
                 best_score = score
-                best_match = item
+                best_item = item
 
                 print(
                     "Possible match:",
@@ -169,27 +144,82 @@ def discover_rns_for_candidate(
                 )
 
         paging = (payload.get("meta") or {}).get("paging") or {}
-        next_cursor = paging.get("nextCursor")
+        cursor = paging.get("nextCursor")
 
-        if not next_cursor:
+        if not cursor:
             break
 
-        cursor = next_cursor
+        page += 1
+        time.sleep(1)
 
-        # Avoid hammering the API
-        time.sleep(2)
+    if best_score >= 12:
+        return best_item
 
-    if best_score < 10:
-        return None
+    return None
 
-    return best_match
+
+def discover_rns_for_candidate(
+    target_name,
+    acquirer_name,
+    approximate_date,
+    days_before=3,
+    days_after=3,
+):
+    """
+    Search a narrow date window around the expected announcement date.
+    Free-tier compatible: only uses dateFrom/dateTo.
+    """
+
+    if isinstance(approximate_date, str):
+        approximate_date = datetime.strptime(
+            approximate_date,
+            "%Y-%m-%d"
+        )
+
+    for offset in range(0, max(days_before, days_after) + 1):
+
+        dates = []
+
+        if offset == 0:
+            dates.append(approximate_date)
+
+        else:
+            if offset <= days_before:
+                dates.append(
+                    approximate_date - timedelta(days=offset)
+                )
+
+            if offset <= days_after:
+                dates.append(
+                    approximate_date + timedelta(days=offset)
+                )
+
+        for date in dates:
+
+            print()
+            print("Searching:", date.strftime("%Y-%m-%d"))
+
+            result = search_day(
+                target_name,
+                acquirer_name,
+                date,
+            )
+
+            if result:
+                return result
+
+    return None
 
 
 if __name__ == "__main__":
+
+    # Known test case
     result = discover_rns_for_candidate(
         target_name="SEGRO plc",
         acquirer_name="Prologis",
-        lookback_days=90,
+        approximate_date="2026-08-04",
+        days_before=1,
+        days_after=1,
     )
 
     print()
