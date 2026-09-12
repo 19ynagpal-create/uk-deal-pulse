@@ -129,7 +129,21 @@ def get_rns_item(rns_identifier):
 
     return payload.get("data")
 
+def get_rns_item(rns_identifier):
+    url = f"{BASE_URL}/{rns_identifier}"
 
+    response = requests.get(
+        url,
+        headers=headers(),
+        timeout=30,
+    )
+
+    response.raise_for_status()
+
+    payload = response.json()
+
+    return payload.get("data")
+    
 if __name__ == "__main__":
     test_identifier = (
         "urn:newsml:londonstockexchange.com:"
