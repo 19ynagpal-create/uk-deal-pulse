@@ -25,6 +25,8 @@ export const Route = createFileRoute("/analytics")({
         property: "og:description",
         content: "Deal activity, sector mix, premiums and buyer composition across tracked UK takeovers.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AnalyticsPage,

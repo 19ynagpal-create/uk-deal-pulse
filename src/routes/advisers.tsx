@@ -31,6 +31,8 @@ export const Route = createFileRoute("/advisers")({
         property: "og:description",
         content: "Advisers appearing most frequently across tracked UK takeovers.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: AdvisersPage,

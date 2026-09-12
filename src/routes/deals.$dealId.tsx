@@ -32,6 +32,8 @@ export const Route = createFileRoute("/deals/$dealId")({
         property: "og:description",
         content: "Deal value, premium, advisers, financing and sources for a tracked UK takeover.",
       },
+      { property: "og:type", content: "article" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: DealDetail,

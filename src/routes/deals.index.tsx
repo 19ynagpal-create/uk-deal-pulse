@@ -34,6 +34,8 @@ export const Route = createFileRoute("/deals/")({
         property: "og:description",
         content: "Search and filter tracked UK public takeover transactions.",
       },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
   component: DealsPage,
