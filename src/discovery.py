@@ -131,78 +131,35 @@ def get_rns_item(rns_identifier):
 
 
 if __name__ == "__main__":
-    matches = get_daily_takeover_rns()
-
-    print()
-    print(
-        f"LIKELY TAKEOVER ANNOUNCEMENTS: "
-        f"{len(matches)}"
+    test_identifier = (
+        "urn:newsml:londonstockexchange.com:"
+        "20260911:5136U:1"
     )
 
-    for index, item in enumerate(matches, start=1):
-        print()
-        print("=" * 70)
-        print(f"MATCH {index}")
-        print("=" * 70)
+    print("=" * 70)
+    print("TESTING SINGLE RNS FETCH")
+    print("=" * 70)
 
-        print("RAW LIST ITEM:")
-        print(item)
+    print()
+    print("IDENTIFIER:")
+    print(test_identifier)
 
-        print()
-        print("AVAILABLE KEYS:")
-        print(list(item.keys()))
+    print()
 
-        possible_ids = [
-            item.get("id"),
-            item.get("guid"),
-            item.get("identifier"),
-            item.get("rnsDateId"),
-            item.get("rnsId"),
-        ]
+    try:
+        full_item = get_rns_item(
+            test_identifier
+        )
 
-        possible_ids = [
-            x for x in possible_ids
-            if x
-        ]
+        print("FULL RNS ITEM:")
+        print(full_item)
 
-        print()
-        print("POSSIBLE IDENTIFIERS:")
-        for value in possible_ids:
-            print(value)
-
-        full_identifier = None
-
-        for value in possible_ids:
-            if (
-                isinstance(value, str)
-                and value.startswith("urn:newsml:")
-            ):
-                full_identifier = value
-                break
-
-        if not full_identifier:
+        if isinstance(full_item, dict):
             print()
-            print(
-                "No full urn:newsml identifier found "
-                "in this item."
-            )
-            continue
+            print("AVAILABLE KEYS:")
+            print(list(full_item.keys()))
 
+    except Exception as exc:
         print()
-        print("FULL IDENTIFIER:")
-        print(full_identifier)
-
-        try:
-            full_item = get_rns_item(
-                full_identifier
-            )
-
-            print()
-            print("FULL RNS ITEM:")
-            print(full_item)
-
-        except Exception as exc:
-            print()
-            print(
-                f"FULL ITEM FETCH ERROR: {exc}"
-            )
+        print("ERROR:")
+        print(exc)
