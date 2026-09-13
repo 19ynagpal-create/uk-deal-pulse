@@ -4,7 +4,7 @@ UK Deal Pulse is an automated UK public M&A intelligence platform that tracks ta
 
 ## Live site
 
-[UK Deal Pulse]((https://ukdealpulse.app/))
+[UK Deal Pulse]([(https://ukdealpulse.app/)])
 
 ## What it does
 
