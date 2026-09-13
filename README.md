@@ -1,24 +1,72 @@
-# Pixel Perfect Mirror
+# UK Deal Pulse
 
-Implement exactly the screenshot and nothing else
+UK Deal Pulse is an automated UK public M&A intelligence platform that tracks takeover activity, structures primary-source announcements and presents deal analytics in a searchable interface.
 
-This project was built with [Lovable](https://lovable.dev).
+## Live site
 
-## Build with Lovable
+[UK Deal Pulse](https://uk-deal-pulse.lovable.app))
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/ae81451b-6043-48a8-8a54-c81278f74523).
+## What it does
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+- Tracks selected UK public takeover activity
+- Monitors current Takeover Panel offer situations
+- Checks RNS announcements automatically
+- Extracts structured transaction data from source documents
+- Applies validation and duplicate checks before publication
+- Provides searchable deal data, analytics and adviser rankings
 
-## Development
+## Data captured
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+The platform structures fields including:
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+- Target
+- Acquirer
+- Announcement date
+- Deal value
+- Sector
+- Buyer type
+- Offer structure
+- Offer price
+- Premium
+- Advisers
+- Financing
+- Status
+- Strategic rationale
+- Source information
+
+## Automation
+
+The automated pipeline runs daily:
+
+Takeover Panel  
+→ RNS discovery  
+→ candidate matching  
+→ full announcement retrieval  
+→ structured extraction  
+→ validation  
+→ duplicate checking  
+→ Supabase  
+→ live website
+
+## Tech stack
+
+- Python
+- Supabase
+- SQL
+- Gemini API
+- Ticker RNS API
+- GitHub Actions
+- Lovable
+- React / TypeScript
+
+## Methodology
+
+UK Deal Pulse uses public primary-source information, including Takeover Panel disclosures and RNS announcements.
+
+AI is used to assist structured extraction from source documents. Unsupported information is left undisclosed rather than estimated.
+
+The dataset may be incomplete and should not be relied upon as investment advice.
+
+## Author
+
+Built and maintained by Yash Nagpal.
